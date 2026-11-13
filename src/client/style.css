@@ -108,26 +108,23 @@ header {
 }
 .brand {
   display: inline-flex;
-  flex-direction: column;
+  flex: none;
   align-items: center;
+  justify-content: center;
+  width: 82px;
+  height: 82px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #000;
 }
 .brand:hover {
   text-decoration: none;
 }
-.brand > span {
-  font-size: 1.8rem;
-  font-weight: 900;
-  letter-spacing: -0.09em;
-  line-height: 1;
-}
-.brand-dot {
-  color: var(--gold);
-}
-.brand small {
-  font-size: 0.6rem;
-  letter-spacing: 0.42em;
-  margin-top: 5px;
-  margin-left: 4px;
+.brand img {
+  flex: none;
+  display: block;
+  width: 145%;
+  height: auto;
 }
 nav {
   display: flex;
@@ -881,11 +878,9 @@ footer small {
     gap: 20px;
     font-size: 0.72rem;
   }
-  .brand > span {
-    font-size: 1.5rem;
-  }
-  .brand small {
-    font-size: 0.5rem;
+  .brand {
+    width: 68px;
+    height: 68px;
   }
   .demo-bar {
     font-size: 0.57rem;

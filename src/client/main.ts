@@ -69,8 +69,7 @@ async function api<T>(path: string, data?: unknown): Promise<T> {
 }
 const bookingBase = () => (isHub ? '/api/admin' : '/api');
 function brand(): string {
-  // Marca tipográfica provisória. Substituir pela logo original ao receber o arquivo.
-  return '<a class="brand" href="/" aria-label="TOMAZ BARBER, início"><span>TOMAZ<span class="brand-dot">.</span></span><small>BARBER</small></a>';
+  return '<a class="brand" href="/" aria-label="TOMAZ BARBER, início"><img src="/tomaz-barber-logo.jpg" width="900" height="1600" alt="" /></a>';
 }
 function shell(content: string): void {
   app.innerHTML = `<div class="demo-bar">AMBIENTE DE TESTE <span>·</span> Utilize apenas dados fictícios</div>
