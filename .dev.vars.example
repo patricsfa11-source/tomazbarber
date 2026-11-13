@@ -1,0 +1,2 @@
+# Copie para .dev.vars somente no ambiente local. Use valores fictícios e exclusivos.
+ADMIN_PASSWORD="troque-por-uma-senha-local-com-20-caracteres"
