@@ -6,8 +6,12 @@ let day = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Bahia' }).format
 while (new Date(`${day}T12:00:00-03:00`).getUTCDay() === 0)
   day = new Date(Date.parse(`${day}T12:00:00-03:00`) + 86400000).toISOString().slice(0, 10);
 async function choose(page: Page, service: string, time: string) {
-  await page.getByRole('radio', { name: new RegExp(service) }).click();
-  await page.getByRole('button', { name: 'Escolher horário' }).click();
+  if (new URL(page.url()).pathname === '/hub') {
+    await page.getByRole('radio', { name: new RegExp(service) }).click();
+    await page.getByRole('button', { name: 'Escolher horário' }).click();
+  } else {
+    await page.getByRole('button', { name: `Agendar ${service}`, exact: true }).click();
+  }
   await page.getByLabel('Data do atendimento').fill(day);
   await page.getByRole('button', { name: time, exact: true }).click();
   await page.getByRole('button', { name: 'Continuar', exact: true }).click();
@@ -19,10 +23,22 @@ test('cliente reserva no celular e o hub vê a mesma reserva; encaixe some do li
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
-  await expect(page.getByRole('radio')).toHaveCount(7);
+  await expect(page.locator('[data-public-service]:visible')).toHaveCount(7);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
+  const search = page.getByRole('searchbox', { name: 'Pesquisar serviço' });
+  await search.fill('pe de cabelo');
+  await expect(page.locator('[data-public-service]:visible')).toHaveCount(1);
+  await expect(
+    page.getByRole('button', { name: 'Agendar Pé de cabelo', exact: true }),
+  ).toBeVisible();
+  await search.fill('serviço inexistente');
+  await expect(page.getByRole('status')).toHaveText('Nenhum serviço encontrado.');
+  await search.clear();
+  await page.getByRole('button', { name: 'Detalhes', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Horário de atendimento' })).toBeVisible();
+  await page.getByRole('button', { name: 'Serviços', exact: true }).click();
   await page.screenshot({ path: 'work/cliente-mobile.png', fullPage: true });
   await choose(page, 'Corte com barba', '10:00');
   await expect(page.getByText('R$ 38,00').first()).toBeVisible();
@@ -59,7 +75,7 @@ test('cliente reserva no celular e o hub vê a mesma reserva; encaixe some do li
   ).toBe(true);
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Escolher horário' }).click();
+  await page.getByRole('button', { name: 'Agendar Corte masculino', exact: true }).click();
   await page.getByLabel('Data do atendimento').fill(day);
   await expect(page.getByRole('button', { name: '11:20', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '10:00', exact: true })).toHaveCount(0);
@@ -103,7 +119,7 @@ test('catálogo e login também cabem em tela de 320px e desktop', async ({ page
   for (const width of [320, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/');
-    await expect(page.getByRole('radio')).toHaveCount(7);
+    await expect(page.locator('[data-public-service]:visible')).toHaveCount(7);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);

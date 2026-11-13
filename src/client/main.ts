@@ -6,6 +6,8 @@ const isHub = location.pathname.replace(/\/$/, '') === '/hub';
 const state = {
   services: [] as Service[],
   serviceId: 'corte',
+  serviceQuery: '',
+  shopDetails: false,
   date: localDate(),
   slots: [] as number[],
   startsAt: 0,
@@ -71,10 +73,13 @@ const bookingBase = () => (isHub ? '/api/admin' : '/api');
 function brand(): string {
   return '<a class="brand" href="/" aria-label="TOMAZ BARBER, início"><img src="/tomaz-barber-logo.jpg" width="900" height="1600" alt="" /></a>';
 }
+function publicCover(): string {
+  return `<header class="shop-cover"><img src="/tomaz-barber-logo.jpg" width="900" height="1600" alt="" fetchpriority="high"><h1>TOMAZ BARBER</h1></header>`;
+}
 function shell(content: string): void {
   app.innerHTML = `<div class="demo-bar">AMBIENTE DE TESTE <span>·</span> Utilize apenas dados fictícios</div>
-    <header>${brand()}<nav aria-label="Navegação principal"><a href="/" ${!isHub ? 'aria-current="page"' : ''}>Agendar</a><a href="/hub" ${isHub ? 'aria-current="page"' : ''}>Hub do barbeiro <span aria-hidden="true">→</span></a></nav></header>
-    <main>${content}</main><footer><span>TOMAZ BARBER</span><p>Segunda a sábado · 7h30 às 20h<br>Horário da Bahia</p><small>Feito para cuidar do seu tempo.</small></footer>`;
+    ${!isHub && state.step === 1 ? publicCover() : `<header>${brand()}<nav aria-label="Navegação principal"><a href="/" ${!isHub ? 'aria-current="page"' : ''}>Agendar</a><a href="/hub" ${isHub ? 'aria-current="page"' : ''}>Hub do barbeiro <span aria-hidden="true">→</span></a></nav></header>`}
+    <main${!isHub && state.step === 1 ? ' class="shop-main"' : ''}>${content}</main><footer><span>TOMAZ BARBER</span><p>Segunda a sábado · 7h30 às 20h<br>Horário da Bahia</p><small>Feito para cuidar do seu tempo.</small></footer>`;
 }
 const errorBox = () =>
   `<div class="error" role="alert" ${state.error ? '' : 'hidden'}>${escape(state.error)}</div>`;
@@ -90,6 +95,40 @@ function serviceView(): string {
     <div class="services" role="radiogroup" aria-label="Serviço">${state.services.map((s, i) => `<button type="button" class="service ${state.serviceId === s.id ? 'selected' : ''}" role="radio" tabindex="${state.serviceId === s.id ? 0 : -1}" aria-checked="${state.serviceId === s.id}" data-service="${s.id}"><span class="service-top"><span class="service-number">0${i + 1}</span><span class="radio" aria-hidden="true"></span></span><strong>${escape(s.name)}</strong><span class="description">${escape(s.description)}</span><span class="service-bottom"><span>${escape(s.price)}</span><small>${s.duration} min</small></span></button>`).join('')}</div>
     <div class="actions"><p class="muted">Preço e duração sem surpresa.</p><button class="primary" data-action="next">Escolher horário <span aria-hidden="true">→</span></button></div>`;
 }
+const searchKey = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim();
+
+function publicCatalog(): string {
+  return `<nav class="shop-nav" aria-label="Informações da barbearia">
+    <button type="button" data-action="services" aria-pressed="${!state.shopDetails}">Serviços</button>
+    <button type="button" data-action="details" aria-pressed="${state.shopDetails}">Detalhes</button>
+  </nav>
+  ${
+    state.shopDetails
+      ? '<section class="shop-details"><h2>Horário de atendimento</h2><p>Segunda a sábado · 7h30 às 20h</p><p>Horário da Bahia</p></section>'
+      : `<section class="shop-catalog" aria-label="Serviços">
+      ${errorBox()}
+      <div class="shop-search"><span aria-hidden="true"></span><input id="service-search" type="search" aria-label="Pesquisar serviço" placeholder="Pesquisar serviço..." value="${escape(state.serviceQuery)}"></div>
+      <ul class="shop-services">${state.services
+        .map(
+          (
+            service,
+          ) => `<li data-service-name="${escape(searchKey(service.name))}" ${searchKey(service.name).includes(searchKey(state.serviceQuery)) ? '' : 'hidden'}>
+        <span class="shop-service-icon" aria-hidden="true">✂</span>
+        <div class="shop-service-info"><h2>${escape(service.name)}</h2><p><span>${escape(service.price)}</span><small>${service.duration} min</small></p></div>
+        <button type="button" class="primary shop-book" data-public-service="${escape(service.id)}" aria-label="Agendar ${escape(service.name)}">Agendar</button>
+      </li>`,
+        )
+        .join('')}</ul>
+      <p class="shop-empty" role="status" ${state.services.some((service) => searchKey(service.name).includes(searchKey(state.serviceQuery))) ? 'hidden' : ''}>Nenhum serviço encontrado.</p>
+    </section>`
+  }`;
+}
+
 function datesView(): string {
   const today = localDate();
   const dates = Array.from({ length: 7 }, (_, i) =>
@@ -144,8 +183,12 @@ function renderBooking(): void {
     shell(confirmation());
     return;
   }
+  if (!isHub && state.step === 1) {
+    shell(publicCatalog());
+    return;
+  }
   shell(
-    `<section class="intro"><span class="eyebrow">${isHub ? 'HUB / NOVO ENCAIXE' : 'SEU ESTILO. SEU TEMPO.'}</span><h1>${isHub ? 'Um lugar na agenda.' : 'Seu próximo corte<br>começa aqui<span>.</span>'}</h1><p>${isHub ? 'A mesma agenda, para quem chega pelo link ou pela porta.' : 'Escolha o serviço, encontre o melhor horário e deixe o resto com a gente.'}</p></section>${steps()}<div class="booking-layout"><section class="booking-content">${errorBox()}${state.step === 1 ? serviceView() : state.step === 2 ? datesView() : detailsView()}${isHub ? '<button class="text-button close-booking" data-action="agenda">Voltar à agenda do hub</button>' : ''}</section>${summary()}</div>`,
+    `${isHub ? '<section class="intro"><span class="eyebrow">HUB / NOVO ENCAIXE</span><h1>Um lugar na agenda.</h1><p>A mesma agenda, para quem chega pelo link ou pela porta.</p></section>' : ''}${steps()}<div class="booking-layout"><section class="booking-content">${errorBox()}${state.step === 1 ? serviceView() : state.step === 2 ? datesView() : detailsView()}${isHub ? '<button class="text-button close-booking" data-action="agenda">Voltar à agenda do hub</button>' : ''}</section>${summary()}</div>`,
   );
 }
 function renderLogin(): void {
@@ -167,7 +210,7 @@ function render(): void {
 function focusStage(): void {
   const target =
     document.querySelector<HTMLElement>('.booking-content h2') ??
-    document.querySelector<HTMLElement>('main h1');
+    document.querySelector<HTMLElement>('main h1, .shop-nav button[aria-pressed="true"]');
   if (target) {
     target.tabIndex = -1;
     target.focus({ preventScroll: true });
@@ -224,6 +267,8 @@ function handleError(error: unknown): void {
 }
 function resetBooking(): void {
   state.receipt = undefined;
+  state.serviceQuery = '';
+  state.shopDetails = false;
   state.step = 1;
   state.startsAt = 0;
   state.key = crypto.randomUUID();
@@ -235,6 +280,15 @@ app.addEventListener('click', async (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
   if (!button || button.disabled || state.busy) return;
   state.error = '';
+  if (button.dataset.publicService) {
+    state.serviceId = button.dataset.publicService;
+    state.startsAt = 0;
+    state.key = crypto.randomUUID();
+    state.step = 2;
+    await loadSlots();
+    focusStage();
+    return;
+  }
   if (button.dataset.service) {
     state.serviceId = button.dataset.service;
     state.startsAt = 0;
@@ -260,6 +314,12 @@ app.addEventListener('click', async (event) => {
     return;
   }
   switch (button.dataset.action) {
+    case 'services':
+    case 'details':
+      state.shopDetails = button.dataset.action === 'details';
+      render();
+      app.querySelector<HTMLButtonElement>(`[data-action="${button.dataset.action}"]`)?.focus();
+      break;
     case 'next':
       state.step++;
       render();
@@ -343,6 +403,17 @@ app.addEventListener('change', async (event) => {
 });
 app.addEventListener('input', (event) => {
   const input = event.target as HTMLInputElement;
+  if (input.id === 'service-search') {
+    state.serviceQuery = input.value;
+    const query = searchKey(input.value);
+    let hasMatches = false;
+    app.querySelectorAll<HTMLLIElement>('[data-service-name]').forEach((row) => {
+      row.hidden = !row.dataset.serviceName?.includes(query);
+      hasMatches ||= !row.hidden;
+    });
+    const empty = app.querySelector<HTMLElement>('.shop-empty');
+    if (empty) empty.hidden = hasMatches;
+  }
   if (input.id === 'name' || input.id === 'phone') {
     state[input.id] = input.value;
     state.key = crypto.randomUUID();
