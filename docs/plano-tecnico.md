@@ -2,6 +2,8 @@
 
 O [briefing](briefing.md) reúne as regras do produto. Este plano propõe a arquitetura e define como demonstrar que a agenda funciona antes de integrar os avisos e o financeiro.
 
+A evolução para estabelecimentos independentes está documentada em [Separação por estabelecimento](estabelecimentos.md). A TOMAZ permanece como primeira unidade; catálogo, expediente, clientes, reservas e sessões passam a ser separados por estabelecimento.
+
 ## Arquitetura proposta
 
 - **Um projeto TypeScript**, com duas interfaces web no mesmo domínio. A página pública abre pelo link no celular. O hub fica em uma área administrativa com autenticação própria e poderá ser instalado como PWA. O servidor autoriza as operações administrativas.

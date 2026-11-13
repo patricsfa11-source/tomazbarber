@@ -156,10 +156,12 @@ describe('agenda única e concorrência no D1', () => {
     >();
     await expect(
       env.DB.prepare(
-        `INSERT INTO appointments (id,request_key,request_fingerprint,origin,customer_name,customer_phone,service_id,service_name,price_label,duration_minutes,starts_at,ends_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+        `INSERT INTO appointments (id,shop_id,customer_id,request_key,request_fingerprint,origin,customer_name,customer_phone,service_id,service_name,price_label,duration_minutes,starts_at,ends_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       )
         .bind(
           'direta',
+          a!.shop_id,
+          a!.customer_id,
           'direta',
           'fingerprint',
           'hub',

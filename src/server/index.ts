@@ -1,10 +1,12 @@
-import { services, localDate } from '../shared';
+import { localDate, type Shop } from '../shared';
+import { firstShop, getShop, getService, getServices, primaryProfessional } from './shops';
 import { ApiError, available, candidates, dayBounds, validateDate } from './schedule';
 
 export interface Env {
   DB: D1Database;
   ASSETS: Fetcher;
   ADMIN_PASSWORD?: string;
+  ADMIN_PASSWORDS?: string;
 }
 interface BookingInput {
   serviceId: string;
@@ -76,31 +78,53 @@ async function body(request: Request): Promise<Record<string, unknown>> {
     throw new ApiError(400, 'Dados inválidos. Confira e tente novamente.');
   }
 }
-async function requireAdmin(request: Request, env: Env) {
-  const token = request.headers
-    .get('Cookie')
-    ?.match(/(?:^|;\s*)tb_session=([a-f0-9]{64})(?:;|$)/)?.[1];
-  if (!token || !env.ADMIN_PASSWORD || env.ADMIN_PASSWORD.length < 20)
-    throw new ApiError(401, 'Entre no hub para continuar.');
+function passwordFor(env: Env, shop: Shop): string | undefined {
+  let password: unknown;
+  if (env.ADMIN_PASSWORDS !== undefined) {
+    try {
+      const passwords: unknown = JSON.parse(env.ADMIN_PASSWORDS);
+      if (!passwords || typeof passwords !== 'object' || Array.isArray(passwords)) return;
+      password = Object.hasOwn(passwords, shop.slug)
+        ? (passwords as Record<string, unknown>)[shop.slug]
+        : undefined;
+    } catch {
+      return;
+    }
+  } else if (shop.id === firstShop) password = env.ADMIN_PASSWORD;
+  return typeof password === 'string' && password.length >= 20 && password.length <= 200
+    ? password
+    : undefined;
+}
+const sessionToken = (request: Request) =>
+  request.headers.get('Cookie')?.match(/(?:^|;\s*)tb_session=([a-f0-9]{64})(?:;|$)/)?.[1];
+async function requireAdmin(request: Request, env: Env, shop: Shop) {
+  const token = sessionToken(request);
+  if (!token || !passwordFor(env, shop))
+    throw new ApiError(401, 'Entre no hub deste estabelecimento para continuar.');
   const session = await env.DB.prepare(
-    'SELECT expires_at FROM admin_sessions WHERE token_hash = ? AND expires_at > unixepoch()',
+    'SELECT expires_at FROM admin_sessions WHERE token_hash = ? AND shop_id = ? AND expires_at > unixepoch()',
   )
-    .bind(await hash(token))
+    .bind(await hash(token), shop.id)
     .first();
-  if (!session) throw new ApiError(401, 'Sua sessão terminou. Entre novamente.');
+  if (!session)
+    throw new ApiError(401, 'Sua sessão não dá acesso a este estabelecimento. Entre novamente.');
 }
-function cookie(request: Request, token: string, maxAge: number) {
-  return `tb_session=${token}; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=${maxAge}${new URL(request.url).protocol === 'https:' ? '; Secure' : ''}`;
+function cookie(request: Request, token: string, maxAge: number, adminPath: string) {
+  return `tb_session=${token}; HttpOnly; SameSite=Strict; Path=${adminPath}; Max-Age=${maxAge}${new URL(request.url).protocol === 'https:' ? '; Secure' : ''}`;
 }
-async function login(request: Request, env: Env) {
-  if (!env.ADMIN_PASSWORD || env.ADMIN_PASSWORD.length < 20)
-    throw new ApiError(503, 'Configure o acesso administrativo no ambiente local.');
+async function login(request: Request, env: Env, shop: Shop, adminPath: string) {
+  const password = passwordFor(env, shop);
+  if (!password)
+    throw new ApiError(
+      503,
+      'Configure o acesso administrativo deste estabelecimento no ambiente local.',
+    );
   const data = await body(request);
   const bucket = await hash(
-    `${request.headers.get('CF-Connecting-IP') || 'local'}:${Math.floor(Date.now() / 900000)}`,
+    `${shop.id}:${request.headers.get('CF-Connecting-IP') || 'local'}:${Math.floor(Date.now() / 900000)}`,
   );
   const attempt = await env.DB.prepare(
-    'INSERT INTO login_attempts (bucket, attempts, expires_at) VALUES (?,1,unixepoch()+900) ON CONFLICT(bucket) DO UPDATE SET attempts = attempts + 1 RETURNING attempts',
+    'INSERT INTO login_attempts (bucket,attempts,expires_at) VALUES (?,1,unixepoch()+900) ON CONFLICT(bucket) DO UPDATE SET attempts = attempts + 1 RETURNING attempts',
   )
     .bind(bucket)
     .first<{ attempts: number }>();
@@ -109,18 +133,21 @@ async function login(request: Request, env: Env) {
   if (
     typeof data.password !== 'string' ||
     data.password.length > 200 ||
-    (await hash(data.password)) !== (await hash(env.ADMIN_PASSWORD))
+    (await hash(data.password)) !== (await hash(password))
   )
     throw new ApiError(401, 'Senha incorreta.');
   const token = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
   await env.DB.batch([
-    env.DB.prepare('DELETE FROM admin_sessions WHERE expires_at <= unixepoch()'),
-    env.DB.prepare('DELETE FROM login_attempts WHERE expires_at <= unixepoch()'),
     env.DB.prepare(
-      'INSERT INTO admin_sessions (token_hash, expires_at) VALUES (?,unixepoch()+28800)',
-    ).bind(await hash(token)),
+      'DELETE FROM admin_sessions WHERE shop_id = ? AND expires_at <= unixepoch()',
+    ).bind(shop.id),
+    env.DB.prepare(
+      'INSERT INTO admin_sessions (token_hash,shop_id,expires_at) VALUES (?,?,unixepoch()+28800)',
+    ).bind(await hash(token), shop.id),
   ]);
-  return json({ ok: true }, 200, { 'Set-Cookie': cookie(request, token, 28800) });
+  return json({ ok: true, shopId: shop.id }, 200, {
+    'Set-Cookie': cookie(request, token, 28800, adminPath),
+  });
 }
 function parseBooking(data: Record<string, unknown>): BookingInput {
   if (
@@ -154,12 +181,12 @@ function parseBooking(data: Record<string, unknown>): BookingInput {
     requestKey: data.requestKey,
   };
 }
-async function book(request: Request, env: Env, origin: 'link' | 'hub') {
+async function book(request: Request, env: Env, shop: Shop, origin: 'link' | 'hub') {
   const input = parseBooking(await body(request));
   const fingerprint = await hash(JSON.stringify({ ...input, origin }));
   const existing = () =>
-    env.DB.prepare('SELECT * FROM appointments WHERE request_key = ?')
-      .bind(input.requestKey)
+    env.DB.prepare('SELECT * FROM appointments WHERE shop_id = ? AND request_key = ?')
+      .bind(shop.id, input.requestKey)
       .first<Appointment>();
   const replay = (a: Appointment) => {
     if (a.request_fingerprint !== fingerprint)
@@ -171,13 +198,12 @@ async function book(request: Request, env: Env, origin: 'link' | 'hub') {
   };
   const previous = await existing();
   if (previous) return replay(previous);
-  const service = services.find((s) => s.id === input.serviceId);
-  if (!service) throw new ApiError(400, 'Serviço inválido.');
+  const service = await getService(env.DB, shop.id, input.serviceId);
   if (!Number.isFinite(new Date(input.startsAt * 1000).getTime()))
     throw new ApiError(400, 'Horário inválido.');
-  const date = localDate(new Date(input.startsAt * 1000));
-  validateDate(date);
-  if (!candidates(date, service.duration).includes(input.startsAt))
+  const date = localDate(new Date(input.startsAt * 1000), shop.timezone);
+  validateDate(date, Date.now(), shop.timezone);
+  if (!candidates(date, service.duration, Date.now(), shop).includes(input.startsAt))
     throw new ApiError(
       400,
       'O serviço precisa caber no expediente e começar em um horário disponível.',
@@ -186,13 +212,20 @@ async function book(request: Request, env: Env, origin: 'link' | 'hub') {
   try {
     // O trigger SQL ocupa todos os segmentos atomicamente. A consulta prévia
     // de disponibilidade nunca é usada como proteção contra concorrência.
-    await env.DB.prepare(
-      `INSERT INTO appointments
-      (id,request_key,request_fingerprint,origin,customer_name,customer_phone,service_id,service_name,price_label,duration_minutes,starts_at,ends_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-    )
-      .bind(
+    await env.DB.batch([
+      env.DB.prepare(
+        'INSERT INTO customers (shop_id,id,full_name,phone) VALUES (?,?,?,?) ON CONFLICT(shop_id,phone) DO NOTHING',
+      ).bind(shop.id, crypto.randomUUID(), input.name, input.phone),
+      env.DB.prepare(
+        `INSERT INTO appointments
+        (id,shop_id,professional_id,customer_id,request_key,request_fingerprint,origin,customer_name,customer_phone,service_id,service_name,price_label,duration_minutes,starts_at,ends_at)
+        VALUES (?,?,?,(SELECT id FROM customers WHERE shop_id = ? AND phone = ?),?,?,?,?,?,?,?,?,?,?,?)`,
+      ).bind(
         id,
+        shop.id,
+        primaryProfessional,
+        shop.id,
+        input.phone,
         input.requestKey,
         fingerprint,
         origin,
@@ -204,12 +237,12 @@ async function book(request: Request, env: Env, origin: 'link' | 'hub') {
         service.duration,
         input.startsAt,
         input.startsAt + service.duration * 60,
-      )
-      .run();
+      ),
+    ]);
   } catch (error) {
     const repeated = await existing();
     if (repeated) return replay(repeated);
-    if (String(error).includes('UNIQUE constraint failed: occupied_segments.starts_at'))
+    if (String(error).includes('UNIQUE constraint failed: occupied_segments.'))
       throw new ApiError(409, 'Esse intervalo acabou de ser reservado. Escolha outro horário.');
     throw error;
   }
@@ -230,54 +263,97 @@ async function book(request: Request, env: Env, origin: 'link' | 'hub') {
 }
 async function api(request: Request, env: Env) {
   const url = new URL(request.url);
-  const path = url.pathname;
   if (request.method !== 'GET' && request.headers.get('Origin') !== url.origin)
-    throw new ApiError(403, 'Abra a página da TOMAZ BARBER para continuar.');
-  if (path === '/api/services' && request.method === 'GET') return json({ services });
-  if (path === '/api/admin/login' && request.method === 'POST') return login(request, env);
-  if (path.startsWith('/api/admin/')) await requireAdmin(request, env);
-  if (
-    (path === '/api/availability' || path === '/api/admin/availability') &&
-    request.method === 'GET'
-  ) {
+    throw new ApiError(403, 'Abra a página do estabelecimento para continuar.');
+  const match = url.pathname.match(/^\/api\/shops\/([^/]+)(\/.*)?$/);
+  const shop = await getShop(env.DB, match ? match[1] : firstShop);
+  // Rotas antigas são aliases exclusivos da TOMAZ; nunca consultam dados globais.
+  const path = match ? match[2] || '/' : url.pathname.slice('/api'.length);
+  const adminPath = match ? `/api/shops/${shop.slug}/admin` : '/api/admin';
+  if (path === '/admin/login' && request.method === 'POST')
+    return login(request, env, shop, adminPath);
+  if (path.startsWith('/admin/')) await requireAdmin(request, env, shop);
+  if (path === '/services' && request.method === 'GET')
+    return json({ shop, services: await getServices(env.DB, shop.id) });
+  if (path === '/' && request.method === 'GET') return json({ shop });
+  if ((path === '/availability' || path === '/admin/availability') && request.method === 'GET') {
     const date = url.searchParams.get('date');
-    validateDate(date);
-    const service = services.find((s) => s.id === url.searchParams.get('serviceId'));
-    if (!service) throw new ApiError(400, 'Escolha um serviço.');
-    return json({ date, slots: await available(env.DB, date, service.duration) });
+    validateDate(date, Date.now(), shop.timezone);
+    const service = await getService(env.DB, shop.id, url.searchParams.get('serviceId') || '');
+    return json({ date, slots: await available(env.DB, shop, date, service.duration) });
   }
-  if (path === '/api/bookings' && request.method === 'POST') return book(request, env, 'link');
-  if (path === '/api/admin/bookings' && request.method === 'POST') return book(request, env, 'hub');
-  if (path === '/api/admin/session' && request.method === 'GET') return json({ ok: true });
-  if (path === '/api/admin/logout' && request.method === 'POST') {
-    const token = request.headers
-      .get('Cookie')
-      ?.match(/(?:^|;\s*)tb_session=([a-f0-9]{64})(?:;|$)/)?.[1];
+  if (path === '/bookings' && request.method === 'POST') return book(request, env, shop, 'link');
+  if (path === '/admin/bookings' && request.method === 'POST')
+    return book(request, env, shop, 'hub');
+  if (path === '/admin/session' && request.method === 'GET')
+    return json({ ok: true, shopId: shop.id });
+  if (path === '/admin/logout' && request.method === 'POST') {
+    const token = sessionToken(request);
     if (token)
-      await env.DB.prepare('DELETE FROM admin_sessions WHERE token_hash = ?')
-        .bind(await hash(token))
+      await env.DB.prepare('DELETE FROM admin_sessions WHERE token_hash = ? AND shop_id = ?')
+        .bind(await hash(token), shop.id)
         .run();
-    return json({ ok: true }, 200, { 'Set-Cookie': cookie(request, '', 0) });
+    return json({ ok: true }, 200, { 'Set-Cookie': cookie(request, '', 0, adminPath) });
   }
-  if (path === '/api/admin/bookings' && request.method === 'GET') {
+  if (path === '/admin/bookings' && request.method === 'GET') {
     const date = url.searchParams.get('date');
-    validateDate(date);
-    const [open, close] = dayBounds(date);
+    validateDate(date, Date.now(), shop.timezone);
+    const [open, close] = dayBounds(date, shop.timezone);
     const { results } = await env.DB.prepare(
-      'SELECT id, customer_name, customer_phone, service_name, price_label, duration_minutes, starts_at, ends_at, origin FROM appointments WHERE starts_at >= ? AND starts_at < ? ORDER BY starts_at',
+      'SELECT id,customer_id,customer_name,customer_phone,service_name,price_label,duration_minutes,starts_at,ends_at,origin FROM appointments WHERE shop_id = ? AND starts_at >= ? AND starts_at < ? ORDER BY starts_at',
     )
-      .bind(open, close)
+      .bind(shop.id, open, close)
       .all();
     return json({ appointments: results });
   }
+  const bookingDetail = path.match(/^\/admin\/bookings\/([^/]+)$/);
+  if (bookingDetail && request.method === 'GET') {
+    const appointment = await env.DB.prepare(
+      'SELECT id,customer_id,customer_name,customer_phone,service_name,price_label,duration_minutes,starts_at,ends_at,origin FROM appointments WHERE shop_id = ? AND id = ?',
+    )
+      .bind(shop.id, bookingDetail[1])
+      .first();
+    if (!appointment) throw new ApiError(404, 'Reserva não encontrada.');
+    return json({ appointment });
+  }
+  if (path === '/admin/customers' && request.method === 'GET') {
+    const after = url.searchParams.get('after') || '';
+    if (after.length > 100) throw new ApiError(400, 'Página de clientes inválida.');
+    const { results } = await env.DB.prepare(
+      'SELECT id,full_name,phone FROM customers WHERE shop_id = ? AND id > ? ORDER BY id LIMIT 101',
+    )
+      .bind(shop.id, after)
+      .all<{ id: string; full_name: string; phone: string }>();
+    const customers = results.slice(0, 100);
+    return json({ customers, nextCursor: results.length > 100 ? customers.at(-1)!.id : null });
+  }
+  const customerDetail = path.match(/^\/admin\/customers\/([^/]+)$/);
+  if (customerDetail && request.method === 'GET') {
+    const customer = await env.DB.prepare(
+      'SELECT id,full_name,phone FROM customers WHERE shop_id = ? AND id = ?',
+    )
+      .bind(shop.id, customerDetail[1])
+      .first();
+    if (!customer) throw new ApiError(404, 'Cliente não encontrado.');
+    return json({ customer });
+  }
   throw new ApiError(404, 'Página não encontrada.');
+}
+async function page(request: Request, env: Env) {
+  const path = new URL(request.url).pathname;
+  if (path.startsWith('/s/')) {
+    const match = path.match(/^\/s\/([^/]+)(?:\/hub)?\/?$/);
+    if (!match) throw new ApiError(404, 'Página não encontrada.');
+    await getShop(env.DB, match[1]);
+  }
+  return env.ASSETS.fetch(request);
 }
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const response = new URL(request.url).pathname.startsWith('/api/')
         ? await api(request, env)
-        : await env.ASSETS.fetch(request);
+        : await page(request, env);
       const secured = new Response(response.body, response);
       secured.headers.set('X-Frame-Options', 'DENY');
       secured.headers.set('Referrer-Policy', 'same-origin');

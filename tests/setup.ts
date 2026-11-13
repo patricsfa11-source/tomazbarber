@@ -7,10 +7,12 @@ declare global {
   namespace Cloudflare {
     interface Env extends WorkerEnv {
       TEST_MIGRATIONS: D1Migration[];
+      TEST_AURORA_MIGRATIONS: D1Migration[];
     }
   }
 }
 beforeEach(async () => {
   await reset();
   await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
+  await applyD1Migrations(env.DB, env.TEST_AURORA_MIGRATIONS, 'test_fixtures');
 });
