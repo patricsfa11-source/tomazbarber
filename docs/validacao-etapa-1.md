@@ -34,4 +34,6 @@ Em outro computador, os comandos usuais estão no [README](../README.md). A CI r
 
 ## Limites desta entrega
 
-Logo original ausente: a interface usa texto provisório. Não há WhatsApp, notificações, publicação, recebimentos, histórico autenticado do cliente, remarcações, cancelamentos ou edição de disponibilidade. Esses itens permanecem nas próximas etapas do [plano técnico](plano-tecnico.md).
+A logo original foi aplicada no cabeçalho compartilhado. Os três testes de navegador foram repetidos sobre o commit `0152b01` e passaram. As [duas capturas para aprovação](previas/README.md) mostram o agendamento e o hub autenticado em viewport de 390 × 844 pixels, com densidade 2 e dados fictícios. A imagem carregou nas duas telas, sem rolagem horizontal ou erros de JavaScript. A aprovação visual do proprietário permanece pendente.
+
+Não há WhatsApp, notificações, publicação, recebimentos, histórico autenticado do cliente, remarcações, cancelamentos ou edição de disponibilidade. Esses itens permanecem nas próximas etapas do [plano técnico](plano-tecnico.md).

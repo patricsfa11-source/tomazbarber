@@ -54,9 +54,11 @@ Cada confirmação leva uma chave aleatória de solicitação. Reenvios com a me
 
 O hub exige sessão armazenada no servidor, com cookie HttpOnly, SameSite Strict e Secure em HTTPS, expiração de 8 horas, revogação no logout e limite de tentativas de senha. Operações de escrita verificam a origem. Rotas públicas não oferecem listagem de clientes, consulta por telefone ou histórico. A reserva pública retorna somente o comprovante daquele pedido, sem nome e telefone.
 
-## Pendências das próximas etapas
+## Identidade visual
 
-Logo original: não consta no repositório. A marca na interface é texto provisório, explicitamente indicado no código. Ao receber o arquivo original, adicione-o em `public/` e substitua `brand()` em `src/client/main.ts`, preservando o texto alternativo.
+A logo original está em `public/tomaz-barber-logo.jpg` e aparece no cabeçalho compartilhado entre agendamento e hub. O arquivo foi preservado; o enquadramento é feito pelo CSS. Veja as [capturas em tela de celular](docs/previas/README.md), com aprovação visual do proprietário pendente.
+
+## Pendências das próximas etapas
 
 Gestão de expediente e pausas, exceções, bloqueios, faixas ocultas só no link, cancelamento, remarcação, verificação do telefone, Meus horários, PWA, financeiro e notificações seguem a divisão do plano técnico. A agenda diária inicial navega entre hoje e os próximos 90 dias; consulta histórica fica para a gestão da agenda.
 
