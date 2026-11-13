@@ -1,0 +1,28 @@
+{
+  "name": "tomazbarber",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run build && wrangler dev --ip 0.0.0.0",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "pretest": "npm run build",
+    "test": "vitest run",
+    "db:migrate": "wrangler d1 migrations apply tomazbarber-dev --local",
+    "db:seed": "node scripts/seed.mjs",
+    "dev:e2e": "npm run build && node scripts/reset-e2e.mjs && wrangler d1 migrations apply tomazbarber-dev --local --persist-to work/e2e && wrangler dev --ip 127.0.0.1 --port 8788 --persist-to work/e2e --var ADMIN_PASSWORD:senha-ficticia-e2e-local-123",
+    "test:browser": "playwright test",
+    "check": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.8.2",
+    "@cloudflare/workers-types": "^5.20261113.1",
+    "@playwright/test": "^1.65.0",
+    "prettier": "^3.10.1",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.8",
+    "vitest": "^4.1.12",
+    "wrangler": "^4.162.0"
+  }
+}
