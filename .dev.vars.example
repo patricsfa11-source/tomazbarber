@@ -1,2 +1,4 @@
 # Copie para .dev.vars somente no ambiente local. Use valores fictícios e exclusivos.
-ADMIN_PASSWORD="troque-por-uma-senha-local-com-20-caracteres"
+# Senhas independentes por slug (mínimo 20 caracteres). Mapa substitui a configuração antiga.
+ADMIN_PASSWORDS='{"tomaz-barber":"troque-por-uma-senha-tomaz-com-20-caracteres","salao-aurora":"troque-por-outra-senha-aurora-com-20-caracteres"}'
+# ADMIN_PASSWORD continua aceito apenas para a TOMAZ quando ADMIN_PASSWORDS não existe.

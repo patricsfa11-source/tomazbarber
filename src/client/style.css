@@ -1263,3 +1263,45 @@ footer small {
     height: 34px;
   }
 }
+
+.brand-name {
+  font-size: 0.75rem;
+  text-align: center;
+  line-height: 1.4;
+  padding: 8px;
+  color: var(--gold);
+}
+.shop-initials {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  transform: translate(-50%, -50%);
+  font-family: Georgia, serif;
+  font-size: 5rem;
+  color: var(--gold);
+}
+.hub-tabs {
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 28px;
+}
+.hub-tabs [aria-pressed='true'] {
+  color: var(--gold);
+  border-bottom: 2px solid var(--gold);
+}
+.customers {
+  list-style: none;
+  margin: 0 0 25px;
+  padding: 0;
+}
+.customers li {
+  padding: 24px 0;
+  border-bottom: 1px solid var(--line);
+}
+.customers h3 {
+  margin-bottom: 12px;
+}
+.customers a {
+  color: var(--gold);
+  font-size: 0.85rem;
+}

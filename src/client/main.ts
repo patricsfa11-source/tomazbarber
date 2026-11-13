@@ -1,9 +1,31 @@
 import './style.css';
-import { addDays, dateLabel, localDate, timeLabel, timezone, type Service } from '../shared';
+import {
+  addDays,
+  dateLabel as formatDate,
+  localDate as formatLocalDate,
+  timeLabel as formatTime,
+  timezone as defaultTimezone,
+  hoursLabel,
+  type Shop,
+  type Service,
+} from '../shared';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
-const isHub = location.pathname.replace(/\/$/, '') === '/hub';
+const route = location.pathname.match(/^\/s\/([^/]+)(\/hub)?\/?$/);
+const shopSlug = route ? route[1] : 'tomaz-barber';
+const publicPath = `/s/${encodeURIComponent(shopSlug)}`;
+const hubPath = `${publicPath}/hub`;
+const apiRoot = `/api/shops/${encodeURIComponent(shopSlug)}`;
+const isHub = Boolean(route?.[2]) || location.pathname.replace(/\/$/, '') === '/hub';
+let timezone = defaultTimezone;
+const localDate = (date = new Date()) => formatLocalDate(date, timezone);
+const dateLabel = (date: string) => formatDate(date, timezone);
+const timeLabel = (seconds: number) => formatTime(seconds, timezone);
 const state = {
+  shop: null as Shop | null,
+  customers: [] as Customer[],
+  customerCursor: null as string | null,
+  hubView: 'agenda' as 'agenda' | 'customers',
   services: [] as Service[],
   serviceId: 'corte',
   serviceQuery: '',
@@ -23,6 +45,11 @@ const state = {
   appointments: [] as AgendaItem[],
   receipt: undefined as Receipt | undefined,
 };
+interface Customer {
+  id: string;
+  full_name: string;
+  phone: string;
+}
 interface Receipt {
   id: string;
   service: string;
@@ -56,7 +83,8 @@ const escape = (value: unknown) =>
   );
 const selected = () => state.services.find((s) => s.id === state.serviceId)!;
 async function api<T>(path: string, data?: unknown): Promise<T> {
-  const response = await fetch(path, {
+  const scopedPath = path.startsWith('/api/') ? `${apiRoot}${path.slice(4)}` : path;
+  const response = await fetch(scopedPath, {
     method: data === undefined ? 'GET' : 'POST',
     headers: data === undefined ? {} : { 'Content-Type': 'application/json' },
     body: data === undefined ? undefined : JSON.stringify(data),
@@ -70,16 +98,25 @@ async function api<T>(path: string, data?: unknown): Promise<T> {
   return result;
 }
 const bookingBase = () => (isHub ? '/api/admin' : '/api');
+const shopName = () => state.shop?.name || 'Agenda';
+const shopHours = () => (state.shop ? hoursLabel(state.shop) : '');
+const zoneLabel = () => (timezone === 'America/Bahia' ? 'Horário da Bahia' : 'Horário local');
 function brand(): string {
-  return '<a class="brand" href="/" aria-label="TOMAZ BARBER, início"><img src="/tomaz-barber-logo.jpg" width="900" height="1600" alt="" /></a>';
+  return `<a class="brand" href="${publicPath}" aria-label="${escape(shopName())}, início">${state.shop?.logoUrl ? `<img src="${escape(state.shop.logoUrl)}" width="900" height="1600" alt="" />` : `<span class="brand-name">${escape(shopName())}</span>`}</a>`;
 }
 function publicCover(): string {
-  return `<header class="shop-cover"><img src="/tomaz-barber-logo.jpg" width="900" height="1600" alt="" fetchpriority="high"><h1>TOMAZ BARBER</h1></header>`;
+  if (!state.shop) return '<header class="shop-cover"><h1>Preparando a agenda…</h1></header>';
+  const initials = shopName()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join('');
+  return `<header class="shop-cover">${state.shop.logoUrl ? `<img src="${escape(state.shop.logoUrl)}" width="900" height="1600" alt="" fetchpriority="high">` : `<span class="shop-initials" aria-hidden="true">${escape(initials)}</span>`}<h1>${escape(shopName())}</h1></header>`;
 }
 function shell(content: string): void {
   app.innerHTML = `<div class="demo-bar">AMBIENTE DE TESTE <span>·</span> Utilize apenas dados fictícios</div>
-    ${!isHub && state.step === 1 ? publicCover() : `<header>${brand()}<nav aria-label="Navegação principal"><a href="/" ${!isHub ? 'aria-current="page"' : ''}>Agendar</a><a href="/hub" ${isHub ? 'aria-current="page"' : ''}>Hub do barbeiro <span aria-hidden="true">→</span></a></nav></header>`}
-    <main${!isHub && state.step === 1 ? ' class="shop-main"' : ''}>${content}</main><footer><span>TOMAZ BARBER</span><p>Segunda a sábado · 7h30 às 20h<br>Horário da Bahia</p><small>Feito para cuidar do seu tempo.</small></footer>`;
+    ${!isHub && state.step === 1 ? publicCover() : `<header>${brand()}<nav aria-label="Navegação principal"><a href="${publicPath}" ${!isHub ? 'aria-current="page"' : ''}>Agendar</a><a href="${hubPath}" ${isHub ? 'aria-current="page"' : ''}>${shopSlug === 'tomaz-barber' ? 'Hub do barbeiro' : 'Painel do salão'} <span aria-hidden="true">→</span></a></nav></header>`}
+    <main${!isHub && state.step === 1 ? ' class="shop-main"' : ''}>${content}</main><footer><span>${escape(shopName())}</span><p>${escape(shopHours())}<br>${zoneLabel()}</p><small>Feito para cuidar do seu tempo.</small></footer>`;
 }
 const errorBox = () =>
   `<div class="error" role="alert" ${state.error ? '' : 'hidden'}>${escape(state.error)}</div>`;
@@ -103,13 +140,13 @@ const searchKey = (value: string) =>
     .trim();
 
 function publicCatalog(): string {
-  return `<nav class="shop-nav" aria-label="Informações da barbearia">
+  return `<nav class="shop-nav" aria-label="Informações do estabelecimento">
     <button type="button" data-action="services" aria-pressed="${!state.shopDetails}">Serviços</button>
     <button type="button" data-action="details" aria-pressed="${state.shopDetails}">Detalhes</button>
   </nav>
   ${
     state.shopDetails
-      ? '<section class="shop-details"><h2>Horário de atendimento</h2><p>Segunda a sábado · 7h30 às 20h</p><p>Horário da Bahia</p></section>'
+      ? `<section class="shop-details"><h2>Horário de atendimento</h2><p>${escape(shopHours())}</p><p>${zoneLabel()}</p></section>`
       : `<section class="shop-catalog" aria-label="Serviços">
       ${errorBox()}
       <div class="shop-search"><span aria-hidden="true"></span><input id="service-search" type="search" aria-label="Pesquisar serviço" placeholder="Pesquisar serviço..." value="${escape(state.serviceQuery)}"></div>
@@ -147,7 +184,7 @@ function datesView(): string {
         return `<button type="button" data-date="${date}" class="date ${state.date === date ? 'selected' : ''}" aria-pressed="${state.date === date}" ${state.loading ? 'disabled' : ''}><small>${new Intl.DateTimeFormat('pt-BR', { weekday: 'short', timeZone: timezone }).format(d).replace('.', '')}</small><strong>${d.getUTCDate()}</strong><small>${new Intl.DateTimeFormat('pt-BR', { month: 'short', timeZone: timezone }).format(d).replace('.', '')}</small></button>`;
       })
       .join('')}</div>
-    <p class="date-caption">${escape(dateLabel(state.date))} <span>· Horário da Bahia</span></p>
+    <p class="date-caption">${escape(dateLabel(state.date))} <span>· ${zoneLabel()}</span></p>
     <div aria-live="polite" aria-busy="${state.loading}">${
       state.loading
         ? '<p class="empty">Consultando horários…</p>'
@@ -163,7 +200,7 @@ function datesView(): string {
                   : '';
               })
               .join('')
-          : `<div class="empty"><strong>Nenhum horário disponível.</strong><p>${new Date(`${state.date}T12:00:00-03:00`).getUTCDay() === 0 ? 'Domingo é nosso dia de pausa.' : 'Os horários deste dia já passaram ou estão ocupados.'} Escolha outra data.</p></div>`
+          : `<div class="empty"><strong>Nenhum horário disponível.</strong><p>${!state.shop?.hours.some((h) => h.weekday === new Date(`${state.date}T12:00:00Z`).getUTCDay()) ? 'Este estabelecimento está fechado nesta data.' : 'Os horários deste dia já passaram ou estão ocupados.'} Escolha outra data.</p></div>`
     }</div>
     <div class="actions"><button class="text-button" data-action="back">← Voltar</button><button class="primary" data-action="next" ${!state.startsAt || state.loading ? 'disabled' : ''}>Continuar <span aria-hidden="true">→</span></button></div>`;
 }
@@ -176,7 +213,7 @@ function detailsView(): string {
 }
 function confirmation(): string {
   const r = state.receipt!;
-  return `<section class="confirmation"><span class="success-mark" aria-hidden="true">✓</span><span class="eyebrow">HORÁRIO GARANTIDO</span><h1>${isHub ? 'Encaixe confirmado.' : 'Nos vemos em breve.'}</h1><p>Seu horário está reservado na TOMAZ BARBER.</p><div class="confirmed-details"><span>${escape(dateLabel(localDate(new Date(r.startsAt * 1000))))}</span><strong>${timeLabel(r.startsAt)}</strong><h2>${escape(r.service)}</h2><p>${escape(r.price)} · ${r.duration} minutos</p><small>Reserva ${escape(r.id.slice(0, 8).toUpperCase())}</small></div><p class="muted">Chegue 10 minutos antes do horário.<br>Nenhuma mensagem de WhatsApp é enviada neste teste.</p><button class="primary" data-action="restart">${isHub ? 'Voltar à agenda' : 'Fazer outra reserva'} <span aria-hidden="true">→</span></button></section>`;
+  return `<section class="confirmation"><span class="success-mark" aria-hidden="true">✓</span><span class="eyebrow">HORÁRIO GARANTIDO</span><h1>${isHub ? 'Encaixe confirmado.' : 'Nos vemos em breve.'}</h1><p>Seu horário está reservado em ${escape(shopName())}.</p><div class="confirmed-details"><span>${escape(dateLabel(localDate(new Date(r.startsAt * 1000))))}</span><strong>${timeLabel(r.startsAt)}</strong><h2>${escape(r.service)}</h2><p>${escape(r.price)} · ${r.duration} minutos</p><small>Reserva ${escape(r.id.slice(0, 8).toUpperCase())}</small></div><p class="muted">Chegue 10 minutos antes do horário.<br>Nenhuma mensagem de WhatsApp é enviada neste teste.</p><button class="primary" data-action="restart">${isHub ? 'Voltar à agenda' : 'Fazer outra reserva'} <span aria-hidden="true">→</span></button></section>`;
 }
 function renderBooking(): void {
   if (state.receipt) {
@@ -193,18 +230,54 @@ function renderBooking(): void {
 }
 function renderLogin(): void {
   shell(
-    `<section class="login"><span class="eyebrow">ÁREA DO BARBEIRO</span><h1>Sua agenda,<br>em um só lugar<span>.</span></h1><p class="muted">Entre para acompanhar os horários e registrar encaixes.</p>${errorBox()}<form id="login-form"><label for="password">Senha do hub<input id="password" type="password" autocomplete="current-password" required maxlength="200"></label><button class="primary" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Entrando…' : 'Entrar no hub'} <span aria-hidden="true">→</span></button></form><p class="note">Acesso restrito · Ambiente de testes</p></section>`,
+    `<section class="login"><span class="eyebrow">${escape(shopName())} / ACESSO AO PAINEL</span><h1>Sua agenda,<br>em um só lugar<span>.</span></h1><p class="muted">Entre para acompanhar os horários e registrar encaixes.</p>${errorBox()}<form id="login-form"><label for="password">Senha do hub<input id="password" type="password" autocomplete="current-password" required maxlength="200"></label><button class="primary" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Entrando…' : 'Entrar no hub'} <span aria-hidden="true">→</span></button></form><p class="note">Acesso restrito · Ambiente de testes</p></section>`,
   );
 }
 function renderAgenda(): void {
   const today = localDate();
-  shell(`<section class="hub-heading"><div><span class="eyebrow">HUB / AGENDA DIÁRIA</span><h1>O dia começa aqui<span>.</span></h1><p class="muted">Reservas pelo link e encaixes, na mesma agenda.</p></div><button class="text-button" data-action="logout">Sair do hub →</button></section>
-    <section class="agenda"><div class="agenda-toolbar"><div><label for="agenda-date">Data da agenda</label><input type="date" id="agenda-date" value="${state.date}" min="${today}" max="${addDays(today, 90)}"></div><button class="primary" data-action="new">+ Novo encaixe</button></div><div class="agenda-day"><h2>${escape(dateLabel(state.date))}</h2><div><span>${state.appointments.length} atendimento${state.appointments.length !== 1 ? 's' : ''}</span><button class="text-button" data-action="refresh">Atualizar ↻</button></div></div>${errorBox()}
-    <div aria-live="polite">${state.loading ? '<p class="empty">Carregando agenda…</p>' : state.appointments.length ? `<ol class="appointments">${state.appointments.map((a) => `<li><div class="appointment-time"><strong>${timeLabel(a.starts_at)}</strong><span>${timeLabel(a.ends_at)}</span></div><div class="appointment-info"><span class="tag">${a.origin === 'hub' ? 'ENCAIXE / HUB' : 'RESERVA / LINK'}</span><h3>${escape(a.customer_name)}</h3><p>${escape(a.service_name)} · ${escape(a.price_label)}</p><a href="tel:${escape(a.customer_phone)}">${escape(a.customer_phone)}</a></div><span class="status">Confirmado</span></li>`).join('')}</ol>` : '<div class="empty"><span class="empty-icon" aria-hidden="true">◷</span><h3>Um dia cheio de possibilidades.</h3><p>Nenhum atendimento nesta data. Os agendamentos aparecem aqui assim que são confirmados.</p></div>'}</div><p class="note">Horário da Bahia · Atualize a agenda para consultar novas reservas.</p></section>`);
+  shell(`<section class="hub-heading"><div><span class="eyebrow">${escape(shopName())} / AGENDA DIÁRIA</span><h1>O dia começa aqui<span>.</span></h1><p class="muted">Reservas pelo link e encaixes, na mesma agenda.</p></div><button class="text-button" data-action="logout">Sair do hub →</button></section>
+    ${hubTabs()}<section class="agenda"><div class="agenda-toolbar"><div><label for="agenda-date">Data da agenda</label><input type="date" id="agenda-date" value="${state.date}" min="${today}" max="${addDays(today, 90)}"></div><button class="primary" data-action="new">+ Novo encaixe</button></div><div class="agenda-day"><h2>${escape(dateLabel(state.date))}</h2><div><span>${state.appointments.length} atendimento${state.appointments.length !== 1 ? 's' : ''}</span><button class="text-button" data-action="refresh">Atualizar ↻</button></div></div>${errorBox()}
+    <div aria-live="polite">${state.loading ? '<p class="empty">Carregando agenda…</p>' : state.appointments.length ? `<ol class="appointments">${state.appointments.map((a) => `<li><div class="appointment-time"><strong>${timeLabel(a.starts_at)}</strong><span>${timeLabel(a.ends_at)}</span></div><div class="appointment-info"><span class="tag">${a.origin === 'hub' ? 'ENCAIXE / HUB' : 'RESERVA / LINK'}</span><h3>${escape(a.customer_name)}</h3><p>${escape(a.service_name)} · ${escape(a.price_label)}</p><a href="tel:${escape(a.customer_phone)}">${escape(a.customer_phone)}</a></div><span class="status">Confirmado</span></li>`).join('')}</ol>` : '<div class="empty"><span class="empty-icon" aria-hidden="true">◷</span><h3>Um dia cheio de possibilidades.</h3><p>Nenhum atendimento nesta data. Os agendamentos aparecem aqui assim que são confirmados.</p></div>'}</div><p class="note">${zoneLabel()} · Atualize a agenda para consultar novas reservas.</p></section>`);
+}
+function hubTabs(): string {
+  return `<nav class="hub-tabs" aria-label="Painel do estabelecimento"><button class="text-button" data-action="agenda-view" aria-pressed="${state.hubView === 'agenda'}">Agenda</button><button class="text-button" data-action="customers" aria-pressed="${state.hubView === 'customers'}">Clientes</button></nav>`;
+}
+function renderCustomers(): void {
+  shell(
+    `<section class="hub-heading"><div><span class="eyebrow">${escape(shopName())} / CLIENTES</span><h1>Seus clientes<span>.</span></h1><p class="muted">Clientes cadastrados nos agendamentos de ${escape(shopName())}.</p></div><button class="text-button" data-action="logout">Sair do hub →</button></section>${hubTabs()}<section class="agenda">${errorBox()}${state.loading ? '<p class="empty" role="status">Carregando clientes…</p>' : state.customers.length ? `<ul class="customers">${state.customers.map((c) => `<li><h3>${escape(c.full_name)}</h3><a href="tel:${escape(c.phone)}">${escape(c.phone)}</a></li>`).join('')}</ul>` : '<p class="empty">Nenhum cliente cadastrado neste estabelecimento.</p>'}${state.customerCursor ? '<button class="primary" data-action="more-customers">Carregar mais clientes</button>' : ''}</section>`,
+  );
+}
+let customerRequest = 0;
+async function loadCustomers(more = false): Promise<void> {
+  const request = ++customerRequest;
+  state.hubView = 'customers';
+  state.loading = true;
+  if (!more) {
+    state.customers = [];
+    state.customerCursor = null;
+  }
+  render();
+  try {
+    const result = await api<{ customers: Customer[]; nextCursor: string | null }>(
+      `/api/admin/customers${more ? `?after=${encodeURIComponent(state.customerCursor || '')}` : ''}`,
+    );
+    if (request === customerRequest) {
+      state.customers = more ? [...state.customers, ...result.customers] : result.customers;
+      state.customerCursor = result.nextCursor;
+    }
+  } catch (error) {
+    if (request === customerRequest) handleError(error);
+  } finally {
+    if (request === customerRequest) {
+      state.loading = false;
+      render();
+    }
+  }
 }
 function render(): void {
   if (!isHub || state.booking) renderBooking();
   else if (!state.loggedIn) renderLogin();
+  else if (state.hubView === 'customers') renderCustomers();
   else renderAgenda();
 }
 function focusStage(): void {
@@ -240,6 +313,7 @@ async function loadSlots(): Promise<void> {
 }
 let agendaRequest = 0;
 async function loadAgenda(): Promise<void> {
+  state.hubView = 'agenda';
   const request = ++agendaRequest;
   state.loading = true;
   state.appointments = [];
@@ -263,6 +337,8 @@ function handleError(error: unknown): void {
   if (error instanceof RequestError && error.status === 401 && isHub) {
     state.loggedIn = false;
     state.booking = false;
+    state.customers = [];
+    state.appointments = [];
   }
 }
 function resetBooking(): void {
@@ -353,6 +429,15 @@ app.addEventListener('click', async (event) => {
       await loadAgenda();
       focusStage();
       break;
+    case 'agenda-view':
+      await loadAgenda();
+      break;
+    case 'customers':
+      await loadCustomers();
+      break;
+    case 'more-customers':
+      await loadCustomers(true);
+      break;
     case 'refresh':
       await loadAgenda();
       break;
@@ -361,6 +446,8 @@ app.addEventListener('click', async (event) => {
         await api('/api/admin/logout', {});
         state.loggedIn = false;
         state.appointments = [];
+        state.customers = [];
+        state.customerCursor = null;
         render();
       } catch (error) {
         handleError(error);
@@ -480,7 +567,13 @@ app.addEventListener('submit', async (event) => {
 async function start(): Promise<void> {
   shell('<p class="empty" role="status">Preparando a agenda…</p>');
   try {
-    state.services = (await api<{ services: Service[] }>('/api/services')).services;
+    const catalog = await api<{ shop: Shop; services: Service[] }>('/api/services');
+    state.shop = catalog.shop;
+    state.services = catalog.services;
+    timezone = catalog.shop.timezone;
+    state.date = localDate();
+    state.serviceId = catalog.services[0]?.id || '';
+    document.title = `${shopName()} · Seu próximo horário`;
     if (isHub) {
       try {
         await api('/api/admin/session');
@@ -494,7 +587,7 @@ async function start(): Promise<void> {
   } catch (error) {
     handleError(error);
     shell(
-      `<section class="login"><h1>Vamos tentar de novo.</h1>${errorBox()}<a class="primary" href="${isHub ? '/hub' : '/'}">Recarregar a página</a></section>`,
+      `<section class="login"><h1>Vamos tentar de novo.</h1>${errorBox()}<a class="primary" href="${isHub ? hubPath : publicPath}">Recarregar a página</a></section>`,
     );
   }
 }

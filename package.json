@@ -11,7 +11,7 @@
     "test": "vitest run",
     "db:migrate": "wrangler d1 migrations apply tomazbarber-dev --local",
     "db:seed": "node scripts/seed.mjs",
-    "dev:e2e": "npm run build && node scripts/reset-e2e.mjs && wrangler d1 migrations apply tomazbarber-dev --local --persist-to work/e2e && wrangler dev --ip 127.0.0.1 --port 8788 --persist-to work/e2e --var ADMIN_PASSWORD:senha-ficticia-e2e-local-123",
+    "dev:e2e": "npm run build && node scripts/reset-e2e.mjs && wrangler d1 migrations apply tomazbarber-dev --local --persist-to work/e2e && wrangler d1 execute tomazbarber-dev --local --persist-to work/e2e --file fixtures/0001_salao_aurora.sql && wrangler dev --ip 127.0.0.1 --port 8788 --persist-to work/e2e --var 'ADMIN_PASSWORDS:{\"tomaz-barber\":\"senha-ficticia-e2e-local-123\",\"salao-aurora\":\"senha-ficticia-aurora-e2e-123\"}'",
     "test:browser": "playwright test",
     "check": "npm run typecheck && npm test"
   },
