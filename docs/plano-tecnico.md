@@ -4,6 +4,8 @@ O [briefing](briefing.md) reúne as regras do produto. Este plano propõe a arqu
 
 A evolução para estabelecimentos independentes está documentada em [Separação por estabelecimento](estabelecimentos.md). A TOMAZ permanece como primeira unidade; catálogo, expediente, clientes, reservas e sessões passam a ser separados por estabelecimento.
 
+A gestão de expediente, pausas, exceções, bloqueios, remarcações e cancelamentos está descrita em [Gestão de agenda](gestao-agenda.md), incluindo a preparação dos lembretes para a futura integração com WhatsApp.
+
 ## Arquitetura proposta
 
 - **Um projeto TypeScript**, com duas interfaces web no mesmo domínio. A página pública abre pelo link no celular. O hub fica em uma área administrativa com autenticação própria e poderá ser instalado como PWA. O servidor autoriza as operações administrativas.
