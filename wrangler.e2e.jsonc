@@ -19,6 +19,20 @@
   ],
   "vars": {
     "CUSTOMER_AUTH_SECRET": "segredo-ficticio-de-verificacao-exclusivo-e2e-123",
+    "WHATSAPP_MODE": "test",
+    "WHATSAPP_TEST_RECIPIENT": "+5575999990500",
+    "WHATSAPP_ENABLED_SINCE": "2020-01-01T00:00:00Z",
+    "WHATSAPP_PUBLIC_BASE_URL": "https://tomaz-ficticio.test",
+    "WHATSAPP_GRAPH_VERSION": "v27.0",
+    "WHATSAPP_PHONE_NUMBER_ID": "111111111111",
+    "WHATSAPP_WABA_ID": "222222222222",
+    "WHATSAPP_ACCESS_TOKEN": "token-ficticio-exclusivo-e2e",
+    "WHATSAPP_APP_SECRET": "app-secret-ficticio-exclusivo-e2e-123",
+    "WHATSAPP_PAYLOAD_SECRET": "payload-secret-ficticio-exclusivo-e2e-123",
+    "WHATSAPP_VERIFY_TOKEN": "verify-token-ficticio-exclusivo-e2e-123",
   },
-  "services": [{ "binding": "VERIFICATION_SENDER", "service": "tomaz-whatsapp-simulado" }],
+  "services": [
+    { "binding": "VERIFICATION_SENDER", "service": "tomaz-whatsapp-simulado" },
+    { "binding": "WHATSAPP_HTTP", "service": "tomaz-whatsapp-simulado" },
+  ],
 }

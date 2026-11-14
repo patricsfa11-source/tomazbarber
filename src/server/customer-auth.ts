@@ -2,8 +2,10 @@ import type { Shop } from '../shared';
 import { hash } from './crypto';
 import { ApiError } from './errors';
 import { normalizePhone } from './phone';
+import { configuration, type WhatsAppEnv } from './whatsapp/meta';
+import { sendAccessCode } from './whatsapp/queue';
 
-export interface CustomerAuthEnv {
+export interface CustomerAuthEnv extends WhatsAppEnv {
   DB: D1Database;
   CUSTOMER_AUTH_SECRET?: string;
   VERIFICATION_SENDER?: Fetcher;
@@ -82,11 +84,7 @@ export async function startVerification(
   data: Record<string, unknown>,
 ) {
   secret(env);
-  if (!env.VERIFICATION_SENDER)
-    throw new ApiError(
-      503,
-      'A verificação pelo WhatsApp ainda não está disponível. Tente mais tarde.',
-    );
+  if (!env.VERIFICATION_SENDER) configuration(env);
   const phone = normalizePhone(data.phone),
     id = crypto.randomUUID(),
     code = randomCode();
@@ -112,22 +110,24 @@ export async function startVerification(
   }
   try {
     // Contrato do remetente: aceitar uma única mensagem por challengeId, sem registrar o código em logs.
-    const response = await env.VERIFICATION_SENDER.fetch(
-      new Request('https://verification-sender/send', {
-        method: 'POST',
-        signal: AbortSignal.timeout(10000),
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          challengeId: id,
-          shopId: shop.id,
-          shopName: shop.name,
-          phone,
-          code,
-          expiresAt,
+    if (env.VERIFICATION_SENDER) {
+      const response = await env.VERIFICATION_SENDER.fetch(
+        new Request('https://verification-sender/send', {
+          method: 'POST',
+          signal: AbortSignal.timeout(10000),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            challengeId: id,
+            shopId: shop.id,
+            shopName: shop.name,
+            phone,
+            code,
+            expiresAt,
+          }),
         }),
-      }),
-    );
-    if (!response.ok) throw new Error('SENDER_FAILED');
+      );
+      if (!response.ok) throw new Error('SENDER_FAILED');
+    } else await sendAccessCode(env, shop, { challengeId: id, phone, code, expiresAt });
     await env.DB.prepare(
       "UPDATE phone_challenges SET delivery_state='sent' WHERE id=? AND shop_id=?",
     )

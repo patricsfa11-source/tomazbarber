@@ -27,6 +27,9 @@ import {
 import { customerBookings, customerReceipt, ownedAppointment } from './customer-bookings';
 import { firstShop, getShop, getService, getServices, primaryProfessional } from './shops';
 import { ApiError, available, dayBounds, validateDate } from './schedule';
+import { processWhatsApp, retryDelivery, testMessage } from './whatsapp/queue';
+import { whatsappWebhook } from './whatsapp/webhook';
+import { whatsappStatus } from './whatsapp/status';
 
 export interface Env extends CustomerAuthEnv {
   DB: D1Database;
@@ -357,6 +360,15 @@ async function api(request: Request, env: Env) {
   if (path === '/admin/login' && request.method === 'POST')
     return login(request, env, shop, adminPath);
   if (path.startsWith('/admin/')) await requireAdmin(request, env, shop);
+  if (path === '/admin/whatsapp' && request.method === 'GET')
+    return json(await whatsappStatus(env, shop));
+  if (path === '/admin/whatsapp/test' && request.method === 'POST')
+    return json(await testMessage(env, shop, await body(request)));
+  const whatsappRetry = path.match(/^\/admin\/whatsapp\/([^/]+)\/retry$/);
+  if (whatsappRetry && request.method === 'POST') {
+    const result = await retryDelivery(env, shop, whatsappRetry[1], await body(request));
+    return json(result);
+  }
   if (path === '/admin/schedule' && request.method === 'GET')
     return json(await scheduleView(env.DB, shop));
   if (path === '/admin/schedule/preview' && request.method === 'POST')
@@ -480,11 +492,26 @@ async function page(request: Request, env: Env) {
   return env.ASSETS.fetch(request);
 }
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     try {
-      const response = new URL(request.url).pathname.startsWith('/api/')
-        ? await api(request, env)
-        : await page(request, env);
+      const path = new URL(request.url).pathname;
+      const response =
+        path === '/webhooks/whatsapp'
+          ? await whatsappWebhook(request, env)
+          : path.startsWith('/api/')
+            ? await api(request, env)
+            : await page(request, env);
+      if (
+        ctx &&
+        response.ok &&
+        request.method === 'POST' &&
+        /^\/api\/(?:shops\/tomaz-barber\/)?(?:admin\/|customer\/)?(?:bookings(?:\/[^/]+\/(?:reschedule|cancel))?|whatsapp\/[^/]+\/retry)$/.test(
+          path,
+        )
+      )
+        ctx.waitUntil(
+          processWhatsApp(env, 3).catch(() => console.error('Falha no processamento WhatsApp')),
+        );
       const secured = new Response(response.body, response);
       secured.headers.set('X-Frame-Options', 'DENY');
       secured.headers.set('Referrer-Policy', 'same-origin');
@@ -503,5 +530,10 @@ export default {
         500,
       );
     }
+  },
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(
+      processWhatsApp(env).catch(() => console.error('Falha no processamento WhatsApp')),
+    );
   },
 } satisfies ExportedHandler<Env>;

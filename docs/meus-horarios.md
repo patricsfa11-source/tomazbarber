@@ -1,5 +1,7 @@
 # Meus horários e verificação do celular
 
+O adaptador Meta e a preparação do piloto real estão descritos em [WhatsApp da TOMAZ BARBER](whatsapp.md). A sessão de acesso continua em 24 horas.
+
 A primeira reserva continua no navegador, com somente nome completo e celular com DDD. Não há senha, e-mail ou instalação de aplicativo. A TOMAZ BARBER mantém o catálogo escuro, a logo e o agendamento atual.
 
 ## Fluxo proposto para avaliação

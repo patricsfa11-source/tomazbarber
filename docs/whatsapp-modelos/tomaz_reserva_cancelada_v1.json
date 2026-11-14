@@ -1,0 +1,22 @@
+{
+  "name": "tomaz_reserva_cancelada_v1",
+  "language": "pt_BR",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Olá, {{1}}. Confirmamos o cancelamento do seu atendimento na TOMAZ BARBER de {{2}}, às {{3}}. Serviço: {{4}}. O horário foi liberado e o lembrete foi cancelado. Consulte seu histórico em {{5}}. Este aviso confirma o cancelamento da reserva.",
+      "example": {
+        "body_text": [
+          [
+            "João",
+            "terça-feira, 17 de novembro de 2026",
+            "10:00",
+            "Corte masculino",
+            "https://exemplo.invalid/s/tomaz-barber/meus-horarios"
+          ]
+        ]
+      }
+    }
+  ]
+}

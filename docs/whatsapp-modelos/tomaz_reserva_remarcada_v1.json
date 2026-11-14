@@ -1,0 +1,22 @@
+{
+  "name": "tomaz_reserva_remarcada_v1",
+  "language": "pt_BR",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Olá, {{1}}. Sua remarcação na TOMAZ BARBER está confirmada. Novo atendimento: {{2}}, às {{3}}. Serviço: {{4}}. O horário anterior foi liberado. Consulte a reserva em {{5}}. Chegue 10 minutos antes do novo horário.",
+      "example": {
+        "body_text": [
+          [
+            "João",
+            "terça-feira, 17 de novembro de 2026",
+            "10:00",
+            "Corte masculino",
+            "https://exemplo.invalid/s/tomaz-barber/meus-horarios"
+          ]
+        ]
+      }
+    }
+  ]
+}
