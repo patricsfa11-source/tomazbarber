@@ -1,0 +1,21 @@
+{
+  "name": "tomaz_lembrete_10min_v1",
+  "language": "pt_BR",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Olá, {{1}}. Lembrete do seu atendimento na TOMAZ BARBER: {{2}} às {{3}}. Confira seus horários em {{4}}. Estamos aguardando você no horário marcado.",
+      "example": {
+        "body_text": [
+          [
+            "João",
+            "Corte masculino",
+            "10:00",
+            "https://exemplo.invalid/s/tomaz-barber/meus-horarios"
+          ]
+        ]
+      }
+    }
+  ]
+}

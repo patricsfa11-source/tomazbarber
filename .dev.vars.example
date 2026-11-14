@@ -1,4 +1,25 @@
-# Copie para .dev.vars somente no ambiente local. Use valores fictícios e exclusivos.
+# Copie para .dev.vars somente no ambiente privado. Testes automatizados usam valores fictícios.
 # Senhas independentes por slug (mínimo 20 caracteres). Mapa substitui a configuração antiga.
 ADMIN_PASSWORDS='{"tomaz-barber":"troque-por-uma-senha-tomaz-com-20-caracteres","salao-aurora":"troque-por-outra-senha-aurora-com-20-caracteres"}'
 # ADMIN_PASSWORD continua aceito apenas para a TOMAZ quando ADMIN_PASSWORDS não existe.
+
+# WhatsApp permanece desligado até configurar o piloto privado e revisar o PR.
+WHATSAPP_MODE=off
+# Configure valores reais SOMENTE em .dev.vars (ignorado) ou em secrets do Worker.
+# Não publique wrangler.e2e.jsonc nem o remetente simulado.
+# CUSTOMER_AUTH_SECRET=
+# WHATSAPP_TEST_RECIPIENT=  # formato +55 seguido de DDD e celular; apenas seu teste autorizado
+# WHATSAPP_ENABLED_SINCE=  # instante de início deste piloto em ISO 8601, como gerado por new Date().toISOString()
+# WHATSAPP_PUBLIC_BASE_URL=  # origem HTTPS do agendamento de teste
+# WHATSAPP_GRAPH_VERSION=  # versão suportada pelo seu aplicativo Meta, por exemplo v27.0
+# WHATSAPP_PHONE_NUMBER_ID=
+# WHATSAPP_WABA_ID=
+# WHATSAPP_ACCESS_TOKEN=
+# WHATSAPP_APP_SECRET=
+# WHATSAPP_VERIFY_TOKEN=
+# WHATSAPP_PAYLOAD_SECRET=
+# WHATSAPP_TEMPLATE_ACCESS_CODE=tomaz_acesso_v1
+# WHATSAPP_TEMPLATE_CONFIRMATION=tomaz_reserva_confirmada_v1
+# WHATSAPP_TEMPLATE_RESCHEDULE=tomaz_reserva_remarcada_v1
+# WHATSAPP_TEMPLATE_CANCELLATION=tomaz_reserva_cancelada_v1
+# WHATSAPP_TEMPLATE_REMINDER=tomaz_lembrete_10min_v1

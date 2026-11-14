@@ -3,6 +3,8 @@
   "name": "tomazbarber-dev",
   "main": "src/server/index.ts",
   "compatibility_date": "2026-11-13",
+  "triggers": { "crons": ["* * * * *"] },
+  "vars": { "WHATSAPP_MODE": "off" },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

@@ -195,6 +195,11 @@ export async function mutateAppointment(
         409,
         'A disponibilidade mudou. Confira os horários; a reserva original foi preservada.',
       );
+    if (String(error).includes('WHATSAPP_SEND_IN_PROGRESS'))
+      throw new ApiError(
+        409,
+        'Uma mensagem deste atendimento está sendo concluída. Aguarde alguns segundos e tente novamente; sua reserva foi preservada.',
+      );
     throw error;
   }
 }

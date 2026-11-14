@@ -1,0 +1,22 @@
+{
+  "name": "tomaz_reserva_confirmada_v1",
+  "language": "pt_BR",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Olá, {{1}}. Sua reserva na TOMAZ BARBER está confirmada para {{2}}, às {{3}}. Serviço: {{4}}. Chegue 10 minutos antes. A tolerância é de 10 minutos após o horário. Cancelamento sem custo com pelo menos 2 horas de antecedência. Em caso de falta, a taxa de R$ 15,00 é tratada presencialmente. Consulte seus horários em {{5}}. Se precisar de orientação, fale com o salão.",
+      "example": {
+        "body_text": [
+          [
+            "João",
+            "terça-feira, 17 de novembro de 2026",
+            "10:00",
+            "Corte masculino",
+            "https://exemplo.invalid/s/tomaz-barber/meus-horarios"
+          ]
+        ]
+      }
+    }
+  ]
+}

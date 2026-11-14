@@ -1,6 +1,7 @@
 import './style.css';
 import { createAgendaManagement } from './agenda-management';
 import { createMyBookings } from './my-bookings';
+import { createWhatsAppManagement } from './whatsapp-management';
 import type { AppointmentRecord } from '../calendar';
 import {
   addDays,
@@ -31,7 +32,7 @@ const state = {
   shop: null as Shop | null,
   customers: [] as Customer[],
   customerCursor: null as string | null,
-  hubView: 'agenda' as 'agenda' | 'customers' | 'settings',
+  hubView: 'agenda' as 'agenda' | 'customers' | 'settings' | 'whatsapp',
   agendaStatus: 'confirmed' as 'confirmed' | 'all',
   notice: '',
   services: [] as Service[],
@@ -213,7 +214,7 @@ function detailsView(): string {
 }
 function confirmation(): string {
   const r = state.receipt!;
-  return `<section class="confirmation"><span class="success-mark" aria-hidden="true">✓</span><span class="eyebrow">HORÁRIO GARANTIDO</span><h1>${isHub ? 'Encaixe confirmado.' : 'Nos vemos em breve.'}</h1><p>Seu horário está reservado em ${escape(shopName())}.</p><div class="confirmed-details"><span>${escape(dateLabel(localDate(new Date(r.startsAt * 1000))))}</span><strong>${timeLabel(r.startsAt)}</strong><h2>${escape(r.service)}</h2><p>${escape(r.price)} · ${r.duration} minutos</p><small>Reserva ${escape(r.id.slice(0, 8).toUpperCase())}</small></div><p class="muted">Chegue 10 minutos antes do horário.<br>Nenhuma mensagem real de WhatsApp é enviada neste teste.</p>${!isHub ? `<a class="primary my-receipt-link" href="${customerPath}">Ver meus horários <span aria-hidden="true">→</span></a>` : ''}<button class="${isHub ? 'primary' : 'text-button'}" data-action="restart">${isHub ? 'Voltar à agenda' : 'Fazer outra reserva'} <span aria-hidden="true">→</span></button></section>`;
+  return `<section class="confirmation"><span class="success-mark" aria-hidden="true">✓</span><span class="eyebrow">HORÁRIO GARANTIDO</span><h1>${isHub ? 'Encaixe confirmado.' : 'Nos vemos em breve.'}</h1><p>Seu horário está reservado em ${escape(shopName())}.</p><div class="confirmed-details"><span>${escape(dateLabel(localDate(new Date(r.startsAt * 1000))))}</span><strong>${timeLabel(r.startsAt)}</strong><h2>${escape(r.service)}</h2><p>${escape(r.price)} · ${r.duration} minutos</p><small>Reserva ${escape(r.id.slice(0, 8).toUpperCase())}</small></div><p class="muted">Chegue 10 minutos antes do horário.<br>Acompanhe sua reserva em Meus horários.</p>${!isHub ? `<a class="primary my-receipt-link" href="${customerPath}">Ver meus horários <span aria-hidden="true">→</span></a>` : ''}<button class="${isHub ? 'primary' : 'text-button'}" data-action="restart">${isHub ? 'Voltar à agenda' : 'Fazer outra reserva'} <span aria-hidden="true">→</span></button></section>`;
 }
 function renderBooking(): void {
   if (state.receipt) {
@@ -240,7 +241,7 @@ function renderAgenda(): void {
     <div aria-live="polite">${state.loading ? '<p class="empty">Carregando agenda…</p>' : state.appointments.length ? `<ol class="appointments">${state.appointments.map((a) => `<li><div class="appointment-time"><strong>${timeLabel(a.starts_at)}</strong><span>${timeLabel(a.ends_at)}</span></div><div class="appointment-info"><span class="tag">${a.origin === 'hub' ? 'ENCAIXE / HUB' : 'RESERVA / LINK'}</span><h3>${escape(a.customer_name)}</h3><p>${escape(a.service_name)} · ${escape(a.price_label)}</p><a href="tel:${escape(a.customer_phone)}">${escape(a.customer_phone)}</a><div class="row-actions">${a.status === 'confirmed' ? `<button class="text-button" data-reschedule="${a.id}">Remarcar</button><button class="text-button danger-text" data-cancel="${a.id}">Cancelar</button>` : ''}<button class="text-button" data-history="${a.id}">Ver histórico</button></div></div><span class="status ${a.status === 'cancelled' ? 'cancelled' : ''}">${a.status === 'cancelled' ? 'Cancelado' : 'Confirmado'}</span></li>`).join('')}</ol>` : '<div class="empty"><span class="empty-icon" aria-hidden="true">◷</span><h3>Um dia cheio de possibilidades.</h3><p>Nenhum atendimento nesta data. Os agendamentos aparecem aqui assim que são confirmados.</p></div>'}</div><p class="note">${zoneLabel()} · Atualize a agenda para consultar novas reservas.</p></section>`);
 }
 function hubTabs(): string {
-  return `<nav class="hub-tabs" aria-label="Painel do estabelecimento"><button class="text-button" data-action="agenda-view" aria-pressed="${state.hubView === 'agenda'}">Agenda</button><button class="text-button" data-action="customers" aria-pressed="${state.hubView === 'customers'}">Clientes</button><button class="text-button" data-action="settings" aria-pressed="${state.hubView === 'settings'}">Configurar agenda</button></nav>`;
+  return `<nav class="hub-tabs" aria-label="Painel do estabelecimento"><button class="text-button" data-action="agenda-view" aria-pressed="${state.hubView === 'agenda'}">Agenda</button><button class="text-button" data-action="customers" aria-pressed="${state.hubView === 'customers'}">Clientes</button><button class="text-button" data-action="settings" aria-pressed="${state.hubView === 'settings'}">Configurar agenda</button><button class="text-button" data-action="whatsapp" aria-pressed="${state.hubView === 'whatsapp'}">WhatsApp</button></nav>`;
 }
 function renderCustomers(): void {
   shell(
@@ -279,6 +280,7 @@ function render(): void {
   else if (!isHub || state.booking) renderBooking();
   else if (!state.loggedIn) renderLogin();
   else if (management.active()) management.render();
+  else if (state.hubView === 'whatsapp') whatsappManagement.render();
   else if (state.hubView === 'customers') renderCustomers();
   else renderAgenda();
 }
@@ -342,6 +344,7 @@ function handleError(error: unknown): void {
     state.customers = [];
     state.appointments = [];
     management.close();
+    whatsappManagement.close();
   }
 }
 function resetBooking(): void {
@@ -384,13 +387,28 @@ const management = createAgendaManagement({
   },
 });
 const myBookings = createMyBookings({ api, shell, escape, shop: () => state.shop!, publicPath });
+const whatsappManagement = createWhatsAppManagement({
+  api,
+  shell,
+  tabs: hubTabs,
+  escape,
+  onError: handleError,
+  render,
+  open: () => {
+    management.close();
+    state.hubView = 'whatsapp';
+    state.booking = false;
+  },
+});
 app.addEventListener('click', async (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
-  if (!button || button.disabled || state.busy || management.busy) return;
+  if (!button || button.disabled || state.busy || management.busy || whatsappManagement.busy)
+    return;
   if (isCustomer) {
     await myBookings.click(button);
     return;
   }
+  if (isHub && state.loggedIn && (await whatsappManagement.click(button))) return;
   state.error = '';
   state.notice = '';
   if (isHub && state.loggedIn && (await management.click(button))) return;
@@ -471,6 +489,9 @@ app.addEventListener('click', async (event) => {
     case 'settings':
       await management.openSettings();
       break;
+    case 'whatsapp':
+      await whatsappManagement.open();
+      break;
     case 'active-bookings':
       management.close();
       state.agendaStatus = 'confirmed';
@@ -497,6 +518,7 @@ app.addEventListener('click', async (event) => {
       break;
     case 'logout':
       management.close();
+      whatsappManagement.close();
       try {
         await api('/api/admin/logout', {});
         state.loggedIn = false;

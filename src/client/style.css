@@ -9,6 +9,31 @@
   --panel: #1b1e19;
   --dark: #121412;
 }
+.wa-content .settings-card > .primary {
+  margin-top: 20px;
+}
+.wa-list-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 30px 0 14px;
+}
+.wa-list-heading h2 {
+  font-size: 1.5rem;
+}
+.wa-deliveries {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0;
+}
+.wa-deliveries h3 {
+  margin: 12px 0;
+}
+.wa-deliveries .text-button {
+  margin-top: 14px;
+  min-height: 44px;
+}
 * {
   box-sizing: border-box;
 }
@@ -1517,6 +1542,7 @@ footer small {
   color: var(--gold);
 }
 .hub-tabs {
+  flex-wrap: wrap;
   border-bottom: 1px solid var(--line);
   display: flex;
   gap: 28px;
