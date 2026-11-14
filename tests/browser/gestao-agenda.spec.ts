@@ -137,7 +137,11 @@ test('configura faixas no celular, preserva reservas afetadas e mantém o outro 
   await page.getByRole('button', { name: 'Revisar faixa', exact: true }).click();
   await expect(page.locator('.preview-card')).toContainText('Cliente Afetado');
   await confirmPreview(page);
-  await expect(page.locator('.affected-card')).toContainText('Cliente Afetado');
+  const affected = page.locator('.affected-card');
+  await expect(affected.getByText('Cliente Afetado')).toBeHidden();
+  await affected.locator('summary').click();
+  await expect(affected.getByText('Cliente Afetado')).toBeVisible();
+  await affected.locator('summary').click();
   expect(await slots(request, 'tomaz-barber', date)).not.toContain(at(date, '11:40'));
   expect(await slots(page.request, 'tomaz-barber', date, true)).toContain(at(date, '11:30'));
   await book(page.request, 'tomaz-barber', 'Encaixe Faixa Oculta', '11:30', date, true);
@@ -170,6 +174,8 @@ test('edita expediente e pausas, cria abertura especial no domingo e mostra as c
     await api(page.request, 'tomaz-barber', '/admin/schedule')
   ).json()) as ScheduleView;
   await openSettings(page);
+  await expect(page.getByLabel('Abertura de sábado', { exact: true })).toBeHidden();
+  await page.locator('.weekday > summary').filter({ hasText: 'Sábado' }).click();
   await page.getByLabel('Abertura de sábado', { exact: true }).fill('08:00');
   await page.getByLabel('Fechamento de sábado', { exact: true }).fill('19:00');
   await page.getByRole('button', { name: 'Adicionar pausa em sábado' }).click();

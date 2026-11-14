@@ -33,6 +33,8 @@ const minutes = (value: string, end = false) => {
 export function createAgendaManagement(o: Options) {
   const e = o.escape;
   let view: null | 'settings' | 'reschedule' | 'cancel' | 'history' = null;
+  const openDays = new Set<number>();
+  let showAffected = false;
   let editor: 'weekly' | 'special' | 'rules' = 'weekly';
   let cfg: ScheduleView | null = null,
     weekly: Weekday[] = [];
@@ -73,6 +75,30 @@ export function createAgendaManagement(o: Options) {
   function timeField(label: string, value: number, attrs: string, disabled = false) {
     return `<label>${label}<input type="time" step="600" value="${inputTime(value)}" ${attrs} ${disabled ? 'disabled' : ''} required></label>`;
   }
+  document.addEventListener(
+    'toggle',
+    (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLDetailsElement)) return;
+      const weekday = target.dataset.weekdayRow;
+      if (weekday !== undefined) {
+        if (target.open) openDays.add(Number(weekday));
+        else openDays.delete(Number(weekday));
+      }
+      if (target.hasAttribute('data-affected-notice')) showAffected = target.open;
+    },
+    true,
+  );
+  document.addEventListener(
+    'invalid',
+    (event) => {
+      const field = event.target;
+      if (!(field instanceof HTMLInputElement)) return;
+      const day = field.closest<HTMLDetailsElement>('[data-weekday-row]');
+      if (day) day.open = true;
+    },
+    true,
+  );
   function affectedList(rows: AffectedBooking[], actions = false) {
     return rows.length
       ? `<ul class="affected-list">${rows.map((a) => `<li><strong>${e(a.customer_name)}</strong><span>${e(a.service_name)}</span><p>${e(when(a.starts_at, a.ends_at))}</p>${actions ? `<div class="row-actions"><button type="button" class="text-button" data-reschedule="${e(a.id)}">Remarcar</button><button type="button" class="text-button danger-text" data-cancel="${e(a.id)}">Cancelar</button></div>` : ''}</li>`).join('')}</ul>`
@@ -86,8 +112,29 @@ export function createAgendaManagement(o: Options) {
       )
       .join('');
   }
+  function dayHours(day: Weekday) {
+    if (!day.enabled) return 'Fechado';
+    const count = day.breaks.length;
+    return `${inputTime(day.opensAt)}–${inputTime(day.closesAt)}${count ? ` · ${count} ${count === 1 ? 'pausa' : 'pausas'}` : ''}`;
+  }
+  function weekdayRow(day: Weekday) {
+    const id = day.weekday;
+    const name = dayNames[id];
+    const label = name.toLowerCase();
+    return `<details class="weekday" data-weekday-row="${id}" ${openDays.has(id) ? 'open' : ''}>
+      <summary><strong>${name}</strong><span data-day-hours>${dayHours(day)}</span></summary>
+      <div class="weekday-fields">
+        <label class="check-label"><input type="checkbox" aria-label="Abrir no dia ${label}" data-weekday="${id}" data-field="enabled" ${day.enabled ? 'checked' : ''}>Dia de atendimento</label>
+        ${day.enabled ? `<div class="time-pair">${timeField(`Abertura de ${label}`, day.opensAt, `data-weekday="${id}" data-field="opensAt"`)}${timeField(`Fechamento de ${label}`, day.closesAt, `data-weekday="${id}" data-field="closesAt"`)}</div>${pausesFields(day.breaks, id)}<button type="button" class="text-button" data-add-pause="${id}" ${day.breaks.length >= 8 ? 'disabled' : ''}>+ Adicionar pausa em ${label}</button>` : ''}
+      </div>
+    </details>`;
+  }
   function weeklyForm() {
-    return `<section class="settings-card"><span class="eyebrow">EXPEDIENTE PADRÃO</span><h2>Como funciona sua semana?</h2><p class="muted">Marque os dias de atendimento e ajuste os horários e as pausas. As pausas fecham os dois canais.</p><form id="weekly-schedule">${weekly.map((d) => `<fieldset class="weekday"><legend><label class="check-label"><input type="checkbox" aria-label="Abrir no dia ${dayNames[d.weekday].toLowerCase()}" data-weekday="${d.weekday}" data-field="enabled" ${d.enabled ? 'checked' : ''}>${dayNames[d.weekday]}</label><span>${d.enabled ? 'Aberto' : 'Fechado'}</span></legend>${d.enabled ? `<div class="time-pair">${timeField(`Abertura de ${dayNames[d.weekday].toLowerCase()}`, d.opensAt, `data-weekday="${d.weekday}" data-field="opensAt"`)}${timeField(`Fechamento de ${dayNames[d.weekday].toLowerCase()}`, d.closesAt, `data-weekday="${d.weekday}" data-field="closesAt"`)}</div>${pausesFields(d.breaks, d.weekday)}<button type="button" class="text-button" data-add-pause="${d.weekday}" ${d.breaks.length >= 8 ? 'disabled' : ''}>+ Adicionar pausa em ${dayNames[d.weekday].toLowerCase()}</button>` : '<p class="note">Sem atendimento no padrão semanal.</p>'}</fieldset>`).join('')}<p class="note">Horários em passos de 10 minutos. Fechamento 00:00 significa o fim do dia.</p><button class="primary">Revisar expediente <span aria-hidden="true">→</span></button></form></section>`;
+    const ordered = [...weekly.slice(1), ...weekly.slice(0, 1)];
+    return `<section class="settings-card weekly-card"><h2>Expediente semanal</h2><p class="muted">Toque em um dia para editar o horário e as pausas.</p><form id="weekly-schedule">${ordered.map(weekdayRow).join('')}<p class="note">Horários em intervalos de 10 minutos. Use 00:00 para fechar no fim do dia.</p><button class="primary">Revisar expediente <span aria-hidden="true">→</span></button></form></section>`;
+  }
+  function affectedNotice(rows: AffectedBooking[]) {
+    return `<details class="affected-card" data-affected-notice ${showAffected ? 'open' : ''}><summary><strong>${rows.length} ${rows.length === 1 ? 'reserva afetada' : 'reservas afetadas'}</strong></summary><div class="affected-content"><p>As reservas seguem confirmadas. Remarque ou cancele quando decidir.</p>${affectedList(rows, true)}</div></details>`;
   }
   function datesFields(prefix: string, from: string, to: string) {
     return `<div class="time-pair"><label>Data inicial ${prefix === 'special' ? 'do horário especial' : 'da faixa'}<input type="date" data-${prefix}="from" value="${from}" min="${o.localDate()}" max="${addDays(o.localDate(), 90)}" required></label><label>Data final ${prefix === 'special' ? 'do horário especial' : 'da faixa'}<input type="date" data-${prefix}="to" value="${to}" min="${from}" max="${addDays(o.localDate(), 90)}" required></label></div>`;
@@ -110,7 +157,7 @@ export function createAgendaManagement(o: Options) {
   }
   function renderSettings() {
     o.shell(
-      `<section class="hub-heading"><div><span class="eyebrow">${e(o.shop().name)} / CONFIGURAÇÕES DE AGENDA</span><h1>Sua agenda.<br>Suas regras<span>.</span></h1><p class="muted">Ajuste a disponibilidade deste estabelecimento.<br>As reservas atuais continuam confirmadas.</p></div></section>${o.tabs()}<section class="settings-content">${errorBox()}${notice ? `<p class="success-note" role="status">${e(notice)}</p>` : ''}${loading ? '<p class="empty" role="status">Carregando configurações…</p>' : preview ? `<section class="settings-card preview-card"><span class="eyebrow">ANTES DE SALVAR</span><h2>Revise a alteração.</h2><p>${e(commandSummary(preview.command))}</p><h3>Reservas afetadas (${preview.affected.length})</h3>${affectedList(preview.affected)}<p class="preserve-note">Nenhuma reserva será cancelada ou remarcada automaticamente. Elas serão preservadas até você decidir o que fazer.</p><form id="save-schedule">${preview.affected.length ? '<label class="check-label"><input type="checkbox" required>Conferi as reservas afetadas e quero preservá-las.</label>' : ''}<div class="actions"><button type="button" class="text-button" data-action="edit-schedule">← Voltar à edição</button><button class="primary" ${busy ? 'disabled' : ''}>${busy ? 'Salvando…' : 'Salvar configuração'}</button></div></form></section>` : cfg ? `${cfg.affected.length ? `<section class="settings-card affected-card"><span class="eyebrow">RESERVAS PRECISAM DE ATENÇÃO</span><h2>${cfg.affected.length} reserva(s) fora da nova disponibilidade.</h2><p class="muted">Continuam confirmadas e ocupando a agenda. Remarque ou cancele cada uma quando decidir.</p>${affectedList(cfg.affected, true)}</section>` : ''}<nav class="settings-tabs" aria-label="Tipos de configuração"><button data-editor="weekly" aria-pressed="${editor === 'weekly'}">Semana</button><button data-editor="special" aria-pressed="${editor === 'special'}">Horários especiais</button><button data-editor="rules" aria-pressed="${editor === 'rules'}">Faixas e bloqueios</button></nav>${editor === 'weekly' ? weeklyForm() : editor === 'special' ? specialForm() : ruleForm()}` : ''}</section>`,
+      `<section class="hub-heading settings-heading"><div><h1>Configurar agenda</h1><p class="muted">${e(o.shop().name)}</p></div></section>${o.tabs()}<section class="settings-content">${errorBox()}${notice ? `<p class="success-note" role="status">${e(notice)}</p>` : ''}${loading ? '<p class="empty" role="status">Carregando configurações…</p>' : preview ? `<section class="settings-card preview-card"><span class="eyebrow">ANTES DE SALVAR</span><h2>Revise a alteração.</h2><p>${e(commandSummary(preview.command))}</p><h3>Reservas afetadas (${preview.affected.length})</h3>${affectedList(preview.affected)}<p class="preserve-note">Nenhuma reserva será cancelada ou remarcada automaticamente. Elas serão preservadas até você decidir o que fazer.</p><form id="save-schedule">${preview.affected.length ? '<label class="check-label"><input type="checkbox" required>Conferi as reservas afetadas e quero preservá-las.</label>' : ''}<div class="actions"><button type="button" class="text-button" data-action="edit-schedule">← Voltar à edição</button><button class="primary" ${busy ? 'disabled' : ''}>${busy ? 'Salvando…' : 'Salvar configuração'}</button></div></form></section>` : cfg ? `${cfg.affected.length ? affectedNotice(cfg.affected) : ''}<nav class="settings-tabs" aria-label="Tipos de configuração"><button data-editor="weekly" aria-pressed="${editor === 'weekly'}">Semana</button><button data-editor="special" aria-pressed="${editor === 'special'}">Horários especiais</button><button data-editor="rules" aria-pressed="${editor === 'rules'}">Faixas e bloqueios</button></nav>${editor === 'weekly' ? weeklyForm() : editor === 'special' ? specialForm() : ruleForm()}` : ''}</section>`,
     );
   }
   function renderAction() {
@@ -339,12 +386,19 @@ export function createAgendaManagement(o: Options) {
         if (field === 'enabled') {
           day.enabled = (input as HTMLInputElement).checked;
           o.render();
+          document
+            .querySelector<HTMLInputElement>(
+              `[data-weekday="${day.weekday}"][data-field="enabled"]`,
+            )
+            ?.focus();
         } else if (input.dataset.pause !== undefined) {
           day.breaks[Number(input.dataset.pause)][field as keyof Pause] = minutes(
             input.value,
             field === 'endsAt',
           );
         } else day[field as 'opensAt' | 'closesAt'] = minutes(input.value, field === 'closesAt');
+        const summary = input.closest('.weekday')?.querySelector('[data-day-hours]');
+        if (summary) summary.textContent = dayHours(day);
         return true;
       }
       if (input.dataset.specialPause !== undefined) {
@@ -420,6 +474,7 @@ export function createAgendaManagement(o: Options) {
           });
           o.onConfig(cfg);
           weekly = structuredClone(cfg.days);
+          openDays.clear();
           preview = null;
           notice = 'Configuração salva. As reservas existentes foram preservadas.';
         } catch (err) {
