@@ -33,7 +33,7 @@ As rotas canônicas são `/api/shops/<slug>/services`, `/availability`, `/bookin
 
 A ocupação tem chave única `(shop_id, professional_id, starts_at)`. A inserção de uma reserva dispara o trigger que ocupa seus segmentos de 10 minutos. O `DB.batch` grava cliente e reserva atomicamente: qualquer colisão desfaz tudo. A chave de idempotência é única por estabelecimento, permitindo o mesmo valor em outro salão sem misturar confirmações.
 
-Nesta entrega, cada estabelecimento tem um único profissional principal. A chave composta prepara o armazenamento para mais profissionais; seleção e gestão de equipes ficam para uma próxima entrega. O expediente de cada um já vem do banco; não foi adicionada uma interface de edição.
+Nesta entrega, cada estabelecimento tem um único profissional principal. A chave composta prepara o armazenamento para mais profissionais; seleção e gestão de equipes ficam para uma próxima entrega. O expediente de cada um vem do banco; sua edição e as ações sobre reservas foram adicionadas na [gestão de agenda](gestao-agenda.md).
 
 ## Migração e validação
 
@@ -55,4 +55,4 @@ Execute `npm run db:migrate` antes de iniciar a aplicação atualizada. A migra�
 
 Para repetir: `npm run check` e `npm run test:browser`. O Playwright usa banco descartável em `work/e2e/`, separado da base de desenvolvimento, e senhas fictícias por estabelecimento. O teste do painel prepara seus próprios dados, sem depender do teste do catálogo. Capturas de cada unidade ficam em `work/`.
 
-WhatsApp, publicação, verificação de telefone, alterações de reservas, edição de disponibilidade e financeiro continuam fora desta entrega.
+A evolução de expediente, disponibilidade, remarcações e cancelamentos está em [Gestão de agenda](gestao-agenda.md). WhatsApp, publicação, verificação de telefone e financeiro continuam para as próximas etapas.

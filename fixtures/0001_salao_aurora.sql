@@ -10,3 +10,4 @@ ON CONFLICT(shop_id,id) DO NOTHING;
 INSERT INTO working_hours
 SELECT 'salao-aurora','principal',CAST(value AS INTEGER),540,1080 FROM json_each('[2,3,4,5,6]') WHERE true
 ON CONFLICT(shop_id,professional_id,weekday) DO NOTHING;
+INSERT INTO schedule_settings (shop_id,professional_id) VALUES ('salao-aurora','principal') ON CONFLICT(shop_id,professional_id) DO NOTHING;
