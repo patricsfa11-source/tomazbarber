@@ -1,5 +1,7 @@
 # Gestão de agenda por estabelecimento
 
+A etapa seguinte está descrita em [Meus horários](meus-horarios.md): acesso do cliente após verificar o telefone, com as mesmas garantias de reserva e regras próprias do canal público.
+
 O hub permite remarcar e cancelar reservas, editar a semana e as pausas, criar horários especiais e restringir faixas por canal. A página pública mantém o visual escuro e o catálogo atual. Nenhuma ação de gestão foi aberta ao cliente; esse acesso continua dependente da verificação do telefone.
 
 ## Usar no celular

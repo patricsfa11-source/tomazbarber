@@ -10,10 +10,19 @@ export default defineConfig({
     launchOptions: { executablePath: process.env.CHROMIUM_PATH || undefined },
     trace: 'retain-on-failure',
   },
-  webServer: {
-    command: 'npm run dev:e2e',
-    url: 'http://127.0.0.1:8788/api/services',
-    reuseExistingServer: false,
-    timeout: 60000,
-  },
+  webServer: [
+    {
+      command:
+        'npx wrangler dev --config tests/whatsapp-simulated/wrangler.jsonc --ip 127.0.0.1 --port 8790 --inspector-port 9230 --persist-to work/sender-e2e',
+      url: 'http://127.0.0.1:8790/health',
+      reuseExistingServer: false,
+      timeout: 60000,
+    },
+    {
+      command: 'npm run dev:e2e',
+      url: 'http://127.0.0.1:8788/api/services',
+      reuseExistingServer: false,
+      timeout: 60000,
+    },
+  ],
 });

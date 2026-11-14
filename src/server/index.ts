@@ -1,4 +1,5 @@
 import { localDate, type Shop } from '../shared';
+import type { AppointmentRecord } from '../calendar';
 import {
   getSchedule,
   scheduleCandidates,
@@ -13,10 +14,21 @@ import {
   mutateAppointment,
 } from './appointments';
 import { hash } from './crypto';
+import { normalizePhone } from './phone';
+import {
+  customerCookie,
+  finishVerification,
+  logoutCustomer,
+  maskedPhone,
+  requireCustomer,
+  startVerification,
+  type CustomerAuthEnv,
+} from './customer-auth';
+import { customerBookings, customerReceipt, ownedAppointment } from './customer-bookings';
 import { firstShop, getShop, getService, getServices, primaryProfessional } from './shops';
 import { ApiError, available, dayBounds, validateDate } from './schedule';
 
-export interface Env {
+export interface Env extends CustomerAuthEnv {
   DB: D1Database;
   ASSETS: Fetcher;
   ADMIN_PASSWORD?: string;
@@ -179,15 +191,10 @@ function parseBooking(data: Record<string, unknown>): BookingInput {
     !/^\p{L}[\p{L}\p{M}'’-]+(?: [\p{L}\p{M}'’-]+)+$/u.test(name)
   )
     throw new ApiError(400, 'Informe seu nome completo.');
-  let phone = data.phone.replace(/\D/g, '');
-  if (phone.length === 12 || phone.length === 13) {
-    if (phone.startsWith('55')) phone = phone.slice(2);
-  }
-  if (!/^[1-9]{2}(?:9\d{8}|[2-5]\d{7})$/.test(phone))
-    throw new ApiError(400, 'Informe um telefone brasileiro com DDD.');
+  const phone = normalizePhone(data.phone);
   return {
     name,
-    phone: `+55${phone}`,
+    phone,
     serviceId: data.serviceId,
     startsAt: data.startsAt,
     requestKey: data.requestKey,
@@ -294,6 +301,59 @@ async function api(request: Request, env: Env) {
   // Rotas antigas são aliases exclusivos da TOMAZ; nunca consultam dados globais.
   const path = match ? match[2] || '/' : url.pathname.slice('/api'.length);
   const adminPath = match ? `/api/shops/${shop.slug}/admin` : '/api/admin';
+  // O acesso do cliente usa uma sessão própria, vinculada ao telefone verificado
+  // e ao salão. Nunca aceita customerId/phone enviados como autorização.
+  const customerPath = match ? `/api/shops/${shop.slug}/customer` : '/api/customer';
+  if (path === '/customer/verification' && request.method === 'POST')
+    return json(await startVerification(request, env, shop, await body(request)), 201);
+  if (path === '/customer/verify' && request.method === 'POST') {
+    const result = await finishVerification(request, env, shop, await body(request));
+    return json({ maskedPhone: result.maskedPhone }, 200, {
+      'Set-Cookie': customerCookie(request, result.token, 86400, customerPath),
+    });
+  }
+  if (path === '/customer/logout' && request.method === 'POST') {
+    await logoutCustomer(request, env, shop);
+    return json({ ok: true }, 200, { 'Set-Cookie': customerCookie(request, '', 0, customerPath) });
+  }
+  if (path.startsWith('/customer/')) {
+    const phone = await requireCustomer(request, env, shop);
+    if (path === '/customer/session' && request.method === 'GET')
+      return json({ maskedPhone: maskedPhone(phone) });
+    if (path === '/customer/bookings' && request.method === 'GET')
+      return json(await customerBookings(env.DB, shop, phone, url));
+    const customerAction = path.match(
+      /^\/customer\/bookings\/([^/]+)(?:\/(reschedule|cancel|availability))?$/,
+    );
+    if (customerAction) {
+      const a = await ownedAppointment(env.DB, shop, customerAction[1], phone);
+      if (!customerAction[2] && request.method === 'GET')
+        return json({ appointment: customerReceipt(a) });
+      if (customerAction[2] === 'availability' && request.method === 'GET') {
+        if (a.status !== 'confirmed') throw new ApiError(409, 'A reserva já foi cancelada.');
+        const date = url.searchParams.get('date');
+        validateDate(date, Date.now(), shop.timezone);
+        return json({
+          slots: await available(env.DB, shop, date, a.duration_minutes, 'link', a.id),
+        });
+      }
+      if (['reschedule', 'cancel'].includes(customerAction[2]) && request.method === 'POST') {
+        const result = await mutateAppointment(
+          env.DB,
+          shop,
+          a.id,
+          customerAction[2] as 'reschedule' | 'cancel',
+          await body(request),
+          phone,
+        );
+        return json({
+          appointment: customerReceipt(result.appointment as AppointmentRecord),
+          replayed: result.replayed,
+        });
+      }
+    }
+    throw new ApiError(404, 'Página não encontrada.');
+  }
   if (path === '/admin/login' && request.method === 'POST')
     return login(request, env, shop, adminPath);
   if (path.startsWith('/admin/')) await requireAdmin(request, env, shop);
@@ -413,7 +473,7 @@ async function api(request: Request, env: Env) {
 async function page(request: Request, env: Env) {
   const path = new URL(request.url).pathname;
   if (path.startsWith('/s/')) {
-    const match = path.match(/^\/s\/([^/]+)(?:\/hub)?\/?$/);
+    const match = path.match(/^\/s\/([^/]+)(?:\/hub|\/meus-horarios)?\/?$/);
     if (!match) throw new ApiError(404, 'Página não encontrada.');
     await getShop(env.DB, match[1]);
   }

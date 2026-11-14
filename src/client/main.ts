@@ -1,5 +1,6 @@
 import './style.css';
 import { createAgendaManagement } from './agenda-management';
+import { createMyBookings } from './my-bookings';
 import type { AppointmentRecord } from '../calendar';
 import {
   addDays,
@@ -13,12 +14,15 @@ import {
 } from '../shared';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
-const route = location.pathname.match(/^\/s\/([^/]+)(\/hub)?\/?$/);
+const route = location.pathname.match(/^\/s\/([^/]+)(\/hub|\/meus-horarios)?\/?$/);
 const shopSlug = route ? route[1] : 'tomaz-barber';
 const publicPath = `/s/${encodeURIComponent(shopSlug)}`;
 const hubPath = `${publicPath}/hub`;
 const apiRoot = `/api/shops/${encodeURIComponent(shopSlug)}`;
-const isHub = Boolean(route?.[2]) || location.pathname.replace(/\/$/, '') === '/hub';
+const isHub = route?.[2] === '/hub' || location.pathname.replace(/\/$/, '') === '/hub';
+const isCustomer =
+  route?.[2] === '/meus-horarios' || location.pathname.replace(/\/$/, '') === '/meus-horarios';
+const customerPath = `${publicPath}/meus-horarios`;
 let timezone = defaultTimezone;
 const localDate = (date = new Date()) => formatLocalDate(date, timezone);
 const dateLabel = (date: string) => formatDate(date, timezone);
@@ -110,8 +114,8 @@ function publicCover(): string {
 }
 function shell(content: string): void {
   app.innerHTML = `<div class="demo-bar">AMBIENTE DE TESTE <span>·</span> Utilize apenas dados fictícios</div>
-    ${!isHub && state.step === 1 ? publicCover() : `<header>${brand()}<nav aria-label="Navegação principal"><a href="${publicPath}" ${!isHub ? 'aria-current="page"' : ''}>Agendar</a><a href="${hubPath}" ${isHub ? 'aria-current="page"' : ''}>${shopSlug === 'tomaz-barber' ? 'Hub do barbeiro' : 'Painel do salão'} <span aria-hidden="true">→</span></a></nav></header>`}
-    <main${!isHub && state.step === 1 ? ' class="shop-main"' : ''}>${content}</main><footer><span>${escape(shopName())}</span><p>${escape(shopHours())}<br>${zoneLabel()}</p><small>Feito para cuidar do seu tempo.</small></footer>`;
+    ${!isHub && !isCustomer && state.step === 1 ? publicCover() : `<header>${brand()}<nav aria-label="Navegação principal"><a href="${publicPath}" ${!isHub && !isCustomer ? 'aria-current="page"' : ''}>Agendar</a><a href="${customerPath}" ${isCustomer ? 'aria-current="page"' : ''}>Meus horários</a>${isCustomer ? '' : `<a href="${hubPath}" ${isHub ? 'aria-current="page"' : ''}>${shopSlug === 'tomaz-barber' ? 'Hub do barbeiro' : 'Painel do salão'} <span aria-hidden="true">→</span></a>`}</nav></header>`}
+    <main${!isHub && !isCustomer && state.step === 1 ? ' class="shop-main"' : ''}>${content}</main><footer><span>${escape(shopName())}</span><p>${escape(shopHours())}<br>${zoneLabel()}</p><small>Feito para cuidar do seu tempo.</small></footer>`;
 }
 const errorBox = () =>
   `<div class="error" role="alert" ${state.error ? '' : 'hidden'}>${escape(state.error)}</div>`;
@@ -138,6 +142,7 @@ function publicCatalog(): string {
   return `<nav class="shop-nav" aria-label="Informações do estabelecimento">
     <button type="button" data-action="services" aria-pressed="${!state.shopDetails}">Serviços</button>
     <button type="button" data-action="details" aria-pressed="${state.shopDetails}">Detalhes</button>
+    <a href="${customerPath}">Meus horários</a>
   </nav>
   ${
     state.shopDetails
@@ -203,12 +208,12 @@ function detailsView(): string {
   return `<span class="eyebrow">03 / REVISE E CONFIRME</span><h2>Quase tudo pronto.</h2><p class="muted">${isHub ? 'Informe os dados do cliente para registrar o encaixe.' : 'Só precisamos de dois dados para reservar seu horário.'}</p>
     <form id="booking-form"><div class="fields"><label for="name">Nome completo<input id="name" name="name" autocomplete="name" required minlength="5" maxlength="100" value="${escape(state.name)}" placeholder="Ex.: João da Silva"></label><label for="phone">Celular com DDD<input id="phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" required maxlength="20" value="${escape(state.phone)}" placeholder="(75) 99999-9999"></label></div>
     <div class="review"><h3>Confira sua reserva</h3><p><strong>${escape(selected().name)}</strong><span>${escape(selected().price)}</span></p><p>${escape(dateLabel(state.date))}<strong>${timeLabel(state.startsAt)} · ${selected().duration} min</strong></p></div>
-    <div class="rules"><h3>Para o seu atendimento</h3><ul><li>Chegue 10 minutos antes. A tolerância é de 10 minutos após o início.</li><li>Cancelamento sem custo com pelo menos 2 horas de antecedência.</li><li>Em caso de falta, taxa de R$ 15,00 tratada presencialmente.</li></ul><p>Neste teste, a confirmação aparece aqui na tela. WhatsApp e alterações da reserva serão disponibilizados em uma próxima etapa.</p></div>
+    <div class="rules"><h3>Para o seu atendimento</h3><ul><li>Chegue 10 minutos antes. A tolerância é de 10 minutos após o início.</li><li>Cancelamento sem custo com pelo menos 2 horas de antecedência.</li><li>Em caso de falta, taxa de R$ 15,00 tratada presencialmente.</li></ul><p>Depois de reservar, acesse Meus horários e verifique seu celular pelo WhatsApp para consultar ou alterar suas reservas. Com menos de 2 horas, combine alterações diretamente com o salão.</p></div>
     <div class="actions"><button type="button" class="text-button" data-action="back" ${state.busy ? 'disabled' : ''}>← Voltar</button><button type="submit" class="primary" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Confirmando…' : isHub ? 'Confirmar encaixe' : 'Confirmar reserva'} <span aria-hidden="true">✓</span></button></div></form>`;
 }
 function confirmation(): string {
   const r = state.receipt!;
-  return `<section class="confirmation"><span class="success-mark" aria-hidden="true">✓</span><span class="eyebrow">HORÁRIO GARANTIDO</span><h1>${isHub ? 'Encaixe confirmado.' : 'Nos vemos em breve.'}</h1><p>Seu horário está reservado em ${escape(shopName())}.</p><div class="confirmed-details"><span>${escape(dateLabel(localDate(new Date(r.startsAt * 1000))))}</span><strong>${timeLabel(r.startsAt)}</strong><h2>${escape(r.service)}</h2><p>${escape(r.price)} · ${r.duration} minutos</p><small>Reserva ${escape(r.id.slice(0, 8).toUpperCase())}</small></div><p class="muted">Chegue 10 minutos antes do horário.<br>Nenhuma mensagem de WhatsApp é enviada neste teste.</p><button class="primary" data-action="restart">${isHub ? 'Voltar à agenda' : 'Fazer outra reserva'} <span aria-hidden="true">→</span></button></section>`;
+  return `<section class="confirmation"><span class="success-mark" aria-hidden="true">✓</span><span class="eyebrow">HORÁRIO GARANTIDO</span><h1>${isHub ? 'Encaixe confirmado.' : 'Nos vemos em breve.'}</h1><p>Seu horário está reservado em ${escape(shopName())}.</p><div class="confirmed-details"><span>${escape(dateLabel(localDate(new Date(r.startsAt * 1000))))}</span><strong>${timeLabel(r.startsAt)}</strong><h2>${escape(r.service)}</h2><p>${escape(r.price)} · ${r.duration} minutos</p><small>Reserva ${escape(r.id.slice(0, 8).toUpperCase())}</small></div><p class="muted">Chegue 10 minutos antes do horário.<br>Nenhuma mensagem real de WhatsApp é enviada neste teste.</p>${!isHub ? `<a class="primary my-receipt-link" href="${customerPath}">Ver meus horários <span aria-hidden="true">→</span></a>` : ''}<button class="${isHub ? 'primary' : 'text-button'}" data-action="restart">${isHub ? 'Voltar à agenda' : 'Fazer outra reserva'} <span aria-hidden="true">→</span></button></section>`;
 }
 function renderBooking(): void {
   if (state.receipt) {
@@ -270,7 +275,8 @@ async function loadCustomers(more = false): Promise<void> {
   }
 }
 function render(): void {
-  if (!isHub || state.booking) renderBooking();
+  if (isCustomer) myBookings.render();
+  else if (!isHub || state.booking) renderBooking();
   else if (!state.loggedIn) renderLogin();
   else if (management.active()) management.render();
   else if (state.hubView === 'customers') renderCustomers();
@@ -377,9 +383,14 @@ const management = createAgendaManagement({
     await loadAgenda();
   },
 });
+const myBookings = createMyBookings({ api, shell, escape, shop: () => state.shop!, publicPath });
 app.addEventListener('click', async (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
   if (!button || button.disabled || state.busy || management.busy) return;
+  if (isCustomer) {
+    await myBookings.click(button);
+    return;
+  }
   state.error = '';
   state.notice = '';
   if (isHub && state.loggedIn && (await management.click(button))) return;
@@ -521,6 +532,10 @@ app.addEventListener('keydown', (event) => {
 });
 app.addEventListener('change', async (event) => {
   const input = event.target as HTMLInputElement;
+  if (isCustomer) {
+    await myBookings.change(input);
+    return;
+  }
   if (isHub && state.loggedIn && (await management.change(input))) return;
   if (input.id === 'date' && input.value) {
     state.date = input.value;
@@ -535,6 +550,10 @@ app.addEventListener('change', async (event) => {
 });
 app.addEventListener('input', (event) => {
   const input = event.target as HTMLInputElement;
+  if (isCustomer) {
+    myBookings.input(input);
+    return;
+  }
   if (isHub && state.loggedIn && management.input(input)) return;
   if (input.id === 'service-search') {
     state.serviceQuery = input.value;
@@ -557,6 +576,10 @@ app.addEventListener('submit', async (event) => {
   if (state.busy || management.busy) return;
   const form = event.target as HTMLFormElement;
   if (!form.reportValidity()) return;
+  if (isCustomer) {
+    await myBookings.submit(form);
+    return;
+  }
   state.error = '';
   if (isHub && state.loggedIn && (await management.submit(form))) return;
   if (form.id === 'login-form') {
@@ -621,6 +644,11 @@ async function start(): Promise<void> {
     state.date = localDate();
     state.serviceId = catalog.services[0]?.id || '';
     document.title = `${shopName()} · Seu próximo horário`;
+    if (isCustomer) {
+      document.title = `${shopName()} · Meus horários`;
+      await myBookings.start();
+      return;
+    }
     if (isHub) {
       try {
         await api('/api/admin/session');
