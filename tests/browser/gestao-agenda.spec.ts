@@ -47,7 +47,7 @@ async function login(page: Page, shop = 'tomaz-barber') {
 }
 async function openSettings(page: Page) {
   await page.getByRole('button', { name: 'Configurar agenda', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Como funciona sua semana?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Expediente semanal' })).toBeVisible();
 }
 async function confirmPreview(page: Page) {
   await expect(page.getByRole('heading', { name: 'Revise a alteração.' })).toBeVisible();
