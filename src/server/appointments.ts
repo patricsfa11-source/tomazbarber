@@ -4,6 +4,7 @@ import { ApiError } from './errors';
 import { hash } from './crypto';
 import { getSchedule, scheduleCandidates } from './schedule-management';
 import { validateDate } from './schedule';
+import { lateChangeNotice } from '../customer';
 
 export const appointmentColumns =
   'id,shop_id,professional_id,customer_id,customer_name,customer_phone,service_name,price_label,duration_minutes,starts_at,ends_at,origin,booking_channel,status,version,cancelled_at';
@@ -53,6 +54,7 @@ export async function mutateAppointment(
   id: string,
   kind: 'reschedule' | 'cancel',
   data: Record<string, unknown>,
+  customerPhone?: string,
 ) {
   const { requestKey, expectedVersion } = data;
   if (
@@ -71,8 +73,18 @@ export async function mutateAppointment(
       !Number.isFinite(new Date(target * 1000).getTime()))
   )
     throw new ApiError(400, 'Escolha o novo horário.');
-  const fingerprint = await hash(JSON.stringify({ id, kind, expectedVersion, startsAt: target }));
+  const fingerprint = await hash(
+    JSON.stringify({
+      id,
+      kind,
+      expectedVersion,
+      startsAt: target,
+      ...(customerPhone ? { customerPhone } : {}),
+    }),
+  );
   const current = await getAppointment(db, shop, id);
+  if (customerPhone && current.customer_phone !== customerPhone)
+    throw new ApiError(404, 'Reserva não encontrada neste estabelecimento.');
   const replay = async () => {
     const event = await db
       .prepare(
@@ -107,6 +119,10 @@ export async function mutateAppointment(
   if (repeated) return repeated;
   if (current.version !== expectedVersion || current.status !== 'confirmed')
     throw new ApiError(409, 'Esta reserva já foi alterada ou cancelada. Recarregue os dados.');
+  // Até a definição da regra tardia, nenhuma alteração autônoma libera um atendimento
+  // com menos de duas horas. O hub mantém a decisão humana para esses casos.
+  if (customerPhone && current.starts_at < Math.floor(Date.now() / 1000) + 7200)
+    throw new ApiError(422, lateChangeNotice);
   let start = current.starts_at,
     revision = 0;
   if (kind === 'reschedule') {
@@ -117,10 +133,18 @@ export async function mutateAppointment(
     validateDate(date, Date.now(), shop.timezone);
     const config = await getSchedule(db, shop);
     revision = config.revision;
-    if (!scheduleCandidates(config, shop, date, current.duration_minutes, 'hub').includes(start))
+    if (
+      !scheduleCandidates(
+        config,
+        shop,
+        date,
+        current.duration_minutes,
+        customerPhone ? 'link' : 'hub',
+      ).includes(start)
+    )
       throw new ApiError(
         400,
-        'O novo horário não cabe na disponibilidade do hub. A reserva original foi preservada.',
+        'O novo horário não cabe na disponibilidade deste canal. A reserva original foi preservada.',
       );
   }
   try {
@@ -128,23 +152,32 @@ export async function mutateAppointment(
       kind === 'reschedule'
         ? db
             .prepare(
-              `UPDATE appointments SET starts_at=?,ends_at=?,booking_channel='hub',schedule_revision=?,version=version+1,action_key=?,action_fingerprint=? WHERE shop_id=? AND id=? AND version=? AND status='confirmed' RETURNING ${appointmentColumns}`,
+              `UPDATE appointments SET starts_at=?,ends_at=?,booking_channel=?,schedule_revision=?,version=version+1,action_key=?,action_fingerprint=? WHERE shop_id=? AND id=? AND version=? AND status='confirmed'${customerPhone ? ' AND customer_phone=? AND starts_at>=unixepoch()+7200' : ''} RETURNING ${appointmentColumns}`,
             )
             .bind(
               start,
               start + current.duration_minutes * 60,
+              customerPhone ? 'link' : 'hub',
               revision,
               requestKey,
               fingerprint,
               shop.id,
               id,
               expectedVersion,
+              ...(customerPhone ? [customerPhone] : []),
             )
         : db
             .prepare(
-              `UPDATE appointments SET status='cancelled',cancelled_at=unixepoch(),version=version+1,action_key=?,action_fingerprint=? WHERE shop_id=? AND id=? AND version=? AND status='confirmed' RETURNING ${appointmentColumns}`,
+              `UPDATE appointments SET status='cancelled',cancelled_at=unixepoch(),version=version+1,action_key=?,action_fingerprint=? WHERE shop_id=? AND id=? AND version=? AND status='confirmed'${customerPhone ? ' AND customer_phone=? AND starts_at>=unixepoch()+7200' : ''} RETURNING ${appointmentColumns}`,
             )
-            .bind(requestKey, fingerprint, shop.id, id, expectedVersion);
+            .bind(
+              requestKey,
+              fingerprint,
+              shop.id,
+              id,
+              expectedVersion,
+              ...(customerPhone ? [customerPhone] : []),
+            );
     const appointment = await statement.first<AppointmentRecord>();
     if (!appointment) {
       const repeated = await replay();

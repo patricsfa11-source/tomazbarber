@@ -803,6 +803,242 @@ footer small {
   font-style: italic;
   font-size: 0.85rem;
 }
+
+/* Área privada do cliente: o mesmo tema do catálogo, com leitura no celular. */
+.my-layout {
+  max-width: 620px;
+  margin: 12px auto 60px;
+}
+.my-heading {
+  margin: 12px 0 28px;
+}
+.my-heading h1 {
+  font-size: clamp(2.1rem, 6vw, 3.5rem);
+  margin: 12px 0;
+}
+.customer-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 24px;
+  margin: 0 0 18px;
+}
+.customer-card h2 {
+  font-size: 1.55rem;
+  line-height: 1.2;
+}
+.customer-card h3 {
+  margin: 22px 0 12px;
+}
+.customer-card p {
+  line-height: 1.6;
+}
+.verify-card h2 {
+  font-size: 2rem;
+  margin: 12px 0 18px;
+}
+.verify-card form {
+  margin-top: 24px;
+}
+.verify-card input {
+  width: 100%;
+  margin-top: 8px;
+}
+.verify-card .primary {
+  width: 100%;
+  margin-top: 20px;
+  justify-content: center;
+  min-height: 52px;
+  white-space: normal;
+  line-height: 1.4;
+  text-align: center;
+}
+.verify-card .note {
+  margin-top: 18px;
+}
+#customer-code-input {
+  letter-spacing: 0.3em;
+  font-size: 1.8rem;
+  text-align: center;
+  padding-left: 24px;
+}
+.verification-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 14px;
+}
+.verification-actions button {
+  font-size: 0.8rem;
+  min-height: 44px;
+}
+.my-session {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 22px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.my-session strong {
+  color: #eeeee8;
+}
+.my-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.my-tabs button {
+  flex: 1;
+  color: var(--muted);
+  background: transparent;
+  border-bottom: 2px solid transparent;
+  padding: 16px;
+}
+.my-tabs button[aria-pressed='true'] {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+}
+.my-bookings {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.my-booking-summary h2 {
+  margin: 10px 0;
+}
+.my-booking-summary .my-when {
+  color: var(--gold);
+  margin-bottom: 14px;
+  font-weight: 600;
+}
+.my-booking-summary > p {
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+.my-booking-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  margin-top: 18px;
+}
+.my-booking-actions .text-button {
+  min-height: 44px;
+  font-size: 0.85rem;
+}
+.my-bookings .status {
+  display: inline-block;
+  margin-top: 18px;
+}
+.customer-policy {
+  padding: 18px 0;
+  font-size: 0.83rem;
+  line-height: 1.65;
+}
+.customer-policy p {
+  margin-top: 10px;
+}
+.my-empty {
+  text-align: center;
+}
+.my-empty > span {
+  display: block;
+  font-size: 2.5rem;
+  color: var(--gold);
+  margin: 8px 0 20px;
+}
+.my-empty p {
+  margin: 18px 0;
+}
+.my-empty .primary {
+  display: flex;
+  justify-content: center;
+}
+.current-slot {
+  border-left: 2px solid var(--gold);
+  padding: 12px 14px;
+  margin: 24px 0;
+  background: #26271e;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.customer-times {
+  margin-top: 20px;
+}
+.my-new-slot {
+  margin-top: 24px;
+}
+.my-new-slot h3 {
+  margin-top: 0;
+}
+.my-new-slot p {
+  text-transform: none;
+}
+.my-turns {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+}
+.my-turns button {
+  flex: 1;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  min-height: 44px;
+  font-size: 0.8rem;
+}
+.my-turns button[aria-pressed='true'] {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+.customer-card .actions {
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.customer-card .actions .primary {
+  flex: 1;
+  justify-content: center;
+  min-width: 180px;
+}
+.my-receipt-link {
+  margin: 20px auto 8px;
+  display: flex;
+  width: fit-content;
+}
+.shop-nav a {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  margin-left: auto;
+  padding: 16px 12px;
+  color: var(--gold);
+  font-size: 0.8rem;
+}
+@media (max-width: 400px) {
+  .customer-card {
+    padding: 20px 16px;
+  }
+  .verify-card .primary {
+    font-size: 0.85rem;
+    padding: 16px 12px;
+  }
+  header nav {
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .shop-nav a {
+    font-size: 0.75rem;
+    padding-inline: 8px;
+  }
+}
 @media (min-width: 1400px) {
   .intro {
     padding-top: 70px;
