@@ -1,13 +1,8 @@
 import { addDays, localDate, localInstant, timezone, type Shop } from '../shared';
 
-export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+export { ApiError } from './errors';
+import { ApiError } from './errors';
+import { getSchedule, scheduleCandidates } from './schedule-management';
 export function validateDate(
   date: unknown,
   now = Date.now(),
@@ -51,15 +46,18 @@ export async function available(
   shop: Shop,
   date: string,
   duration: number,
+  channel: 'link' | 'hub' = 'link',
+  ignoreId = '',
 ): Promise<number[]> {
   const [open, close] = dayBounds(date, shop.timezone);
   const { results } = await db
     .prepare(
-      'SELECT starts_at, ends_at FROM appointments WHERE shop_id = ? AND professional_id = ? AND starts_at < ? AND ends_at > ?',
+      "SELECT starts_at, ends_at FROM appointments WHERE shop_id = ? AND professional_id = ? AND starts_at < ? AND ends_at > ? AND status='confirmed' AND id<>?",
     )
-    .bind(shop.id, 'principal', close, open)
+    .bind(shop.id, 'principal', close, open, ignoreId)
     .all<{ starts_at: number; ends_at: number }>();
-  return candidates(date, duration, Date.now(), shop).filter(
+  const config = await getSchedule(db, shop);
+  return scheduleCandidates(config, shop, date, duration, channel).filter(
     (start) => !results.some((a) => start < a.ends_at && start + duration * 60 > a.starts_at),
   );
 }

@@ -7,6 +7,7 @@ Sistema de agendamento com dados separados por estabelecimento. A TOMAZ BARBER �
 - [Briefing do produto](docs/briefing.md) — serviços, agenda, WhatsApp, recebimentos e identidade visual.
 - [Plano técnico](docs/plano-tecnico.md) — arquitetura proposta, etapas e testes de aceite.
 - [Separação por estabelecimento](docs/estabelecimentos.md) — links, acesso, migração e validação do isolamento.
+- [Gestão de agenda](docs/gestao-agenda.md) — expediente editável, bloqueios por canal, reservas afetadas, remarcação, cancelamento e preparação dos lembretes.
 
 ## Primeira etapa implementada
 
@@ -17,6 +18,8 @@ Sistema de agendamento com dados separados por estabelecimento. A TOMAZ BARBER �
 - API TypeScript em Cloudflare Workers; persistência em D1/SQLite com migração versionada.
 - Expediente da TOMAZ de segunda a sábado, 7h30–20h; Aurora de terça a sábado, 9h–18h, ambos em `America/Bahia`. Inícios de 10 em 10 minutos, duração completa dentro do expediente próprio e horizonte inicial de 90 dias.
 - Proteção contra sobreposição no banco e reenvio idempotente da mesma solicitação. A reserva preserva nome, duração e preço anunciado do serviço.
+- **Configurar agenda** no hub: semana, pausas, horários especiais por data/período, faixas ocultas só no link e bloqueios nos dois canais. As alterações têm prévia e preservam as reservas confirmadas afetadas.
+- **Remarcar**, **Cancelar** e **Ver histórico** na agenda. A remarcação ocupa o novo horário antes de liberar o antigo; o cancelamento libera a faixa e mantém o registro.
 
 ## Executar localmente
 
@@ -47,9 +50,9 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-`check` executa TypeScript, build e os testes da API no runtime Workers com D1 local. A suíte cobre migração da base antiga; catálogos e expedientes separados; isolamento de clientes e reservas; tentativas de usar uma sessão ou IDs do outro estabelecimento; reservas simultâneas no mesmo horário em salões diferentes; conflito dentro de cada salão; rollback completo e reenvio idempotente.
+`check` executa TypeScript, build e 74 testes da API no runtime Workers com D1 local. A suíte cobre migração, isolamento, conflitos de reserva e remarcação, cancelamento, histórico, lembretes, expediente, pausas, exceções, regras por canal e prévias protegidas contra alterações concorrentes.
 
-O Playwright inicia seu próprio servidor na porta 8788, usa senhas fictícias diferentes para os dois estabelecimentos e recria apenas `work/e2e/`. Não acessa o banco de desenvolvimento. Exercita reservas e encaixes, dois painéis no mesmo navegador, listagem privada de clientes, atualização após conflito e telas de 320, 390 e 1440 pixels. Para usar Chromium já instalado, defina `CHROMIUM_PATH` com o caminho do executável. Capturas ficam em `work/` e não são versionadas.
+O Playwright inicia seu próprio servidor na porta 8788, usa senhas fictícias diferentes para os dois estabelecimentos e recria apenas `work/e2e/`. Não acessa o banco de desenvolvimento. Os nove testes exercitam os fluxos anteriores e a gestão da agenda, incluindo configurações em telas de 320 e 390 pixels. Para usar Chromium já instalado, defina `CHROMIUM_PATH` com o caminho do executável. Capturas de execução ficam em `work/`; as [prévias para revisão](docs/previas-agenda/README.md) são uma seleção versionada.
 
 ## Decisões de implementação
 
@@ -65,6 +68,6 @@ A logo original está em `public/tomaz-barber-logo.jpg` e aparece no cabeçalho 
 
 ## Pendências das próximas etapas
 
-Gestão de expediente e pausas, exceções, bloqueios, faixas ocultas só no link, cancelamento, remarcação, verificação do telefone, Meus horários, PWA, financeiro e notificações seguem a divisão do plano técnico. A agenda diária inicial navega entre hoje e os próximos 90 dias; consulta histórica fica para a gestão da agenda.
+Verificação do telefone, acesso do cliente a Meus horários, PWA, financeiro, notificações e gestão de equipes continuam nas próximas etapas. O hub já consulta o histórico por data e faz remarcações e cancelamentos; essas ações ainda não são públicas para o cliente.
 
-WhatsApp e publicação ficam para as etapas seguintes. Neste ambiente, a confirmação aparece somente na tela, sem enviar mensagens. As regras de chegada, tolerância, cancelamento e falta são exibidas para revisão; ainda não há ações de alteração ou cobrança. A configuração real de acesso, proteção contra abuso da API pública e o piloto com o barbeiro devem ser preparados antes de divulgar um link.
+WhatsApp e publicação ficam para as etapas seguintes. Neste ambiente, a confirmação aparece somente na tela, sem enviar mensagens. Criações, remarcações e cancelamentos já registram histórico, estado desejado do lembrete e eventos duráveis para a futura integração. Não há cobrança automática. A configuração real de acesso, proteção contra abuso da API pública e o piloto com o barbeiro devem ser preparados antes de divulgar um link.

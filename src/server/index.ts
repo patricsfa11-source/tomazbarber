@@ -1,6 +1,20 @@
 import { localDate, type Shop } from '../shared';
+import {
+  getSchedule,
+  scheduleCandidates,
+  scheduleView,
+  previewSchedule,
+  saveSchedule,
+} from './schedule-management';
+import {
+  appointmentColumns,
+  getAppointment,
+  appointmentDetail,
+  mutateAppointment,
+} from './appointments';
+import { hash } from './crypto';
 import { firstShop, getShop, getService, getServices, primaryProfessional } from './shops';
-import { ApiError, available, candidates, dayBounds, validateDate } from './schedule';
+import { ApiError, available, dayBounds, validateDate } from './schedule';
 
 export interface Env {
   DB: D1Database;
@@ -24,21 +38,19 @@ interface Appointment {
   starts_at: number;
   ends_at: number;
   origin: string;
+  status: string;
+  version: number;
 }
 const json = (data: unknown, status = 200, headers: HeadersInit = {}) =>
   Response.json(data, {
     status,
     headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...headers },
   });
-async function hash(value: string): Promise<string> {
-  return Array.from(
-    new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))),
-    (b) => b.toString(16).padStart(2, '0'),
-  ).join('');
-}
 function receipt(a: Appointment) {
   return {
     id: a.id,
+    status: a.status,
+    version: a.version,
     service: a.service_name,
     price: a.price_label,
     duration: a.duration_minutes,
@@ -46,7 +58,7 @@ function receipt(a: Appointment) {
     endsAt: a.ends_at,
   };
 }
-async function body(request: Request): Promise<Record<string, unknown>> {
+async function body(request: Request, maxBytes = 4096): Promise<Record<string, unknown>> {
   if (!request.headers.get('content-type')?.startsWith('application/json'))
     throw new ApiError(415, 'Envie os dados em JSON.');
   // Limite também durante a leitura: Content-Length pode estar ausente.
@@ -58,7 +70,7 @@ async function body(request: Request): Promise<Record<string, unknown>> {
     const { done, value } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > 4096) {
+    if (size > maxBytes) {
       await reader.cancel();
       throw new ApiError(413, 'Solicitação muito grande.');
     }
@@ -194,6 +206,11 @@ async function book(request: Request, env: Env, shop: Shop, origin: 'link' | 'hu
         409,
         'Esta solicitação já foi usada. Atualize os dados e tente novamente.',
       );
+    if (a.status === 'cancelled')
+      throw new ApiError(
+        409,
+        'A reserva desta solicitação já foi cancelada. Escolha um novo horário.',
+      );
     return json({ appointment: receipt(a), replayed: true });
   };
   const previous = await existing();
@@ -203,7 +220,8 @@ async function book(request: Request, env: Env, shop: Shop, origin: 'link' | 'hu
     throw new ApiError(400, 'Horário inválido.');
   const date = localDate(new Date(input.startsAt * 1000), shop.timezone);
   validateDate(date, Date.now(), shop.timezone);
-  if (!candidates(date, service.duration, Date.now(), shop).includes(input.startsAt))
+  const config = await getSchedule(env.DB, shop);
+  if (!scheduleCandidates(config, shop, date, service.duration, origin).includes(input.startsAt))
     throw new ApiError(
       400,
       'O serviço precisa caber no expediente e começar em um horário disponível.',
@@ -218,8 +236,8 @@ async function book(request: Request, env: Env, shop: Shop, origin: 'link' | 'hu
       ).bind(shop.id, crypto.randomUUID(), input.name, input.phone),
       env.DB.prepare(
         `INSERT INTO appointments
-        (id,shop_id,professional_id,customer_id,request_key,request_fingerprint,origin,customer_name,customer_phone,service_id,service_name,price_label,duration_minutes,starts_at,ends_at)
-        VALUES (?,?,?,(SELECT id FROM customers WHERE shop_id = ? AND phone = ?),?,?,?,?,?,?,?,?,?,?,?)`,
+        (id,shop_id,professional_id,customer_id,request_key,request_fingerprint,origin,customer_name,customer_phone,service_id,service_name,price_label,duration_minutes,starts_at,ends_at,schedule_revision,booking_channel)
+        VALUES (?,?,?,(SELECT id FROM customers WHERE shop_id = ? AND phone = ?),?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       ).bind(
         id,
         shop.id,
@@ -237,11 +255,15 @@ async function book(request: Request, env: Env, shop: Shop, origin: 'link' | 'hu
         service.duration,
         input.startsAt,
         input.startsAt + service.duration * 60,
+        config.revision,
+        origin,
       ),
     ]);
   } catch (error) {
     const repeated = await existing();
     if (repeated) return replay(repeated);
+    if (String(error).includes('SCHEDULE_CHANGED'))
+      throw new ApiError(409, 'A disponibilidade mudou. Confira os horários novamente.');
     if (String(error).includes('UNIQUE constraint failed: occupied_segments.'))
       throw new ApiError(409, 'Esse intervalo acabou de ser reservado. Escolha outro horário.');
     throw error;
@@ -250,6 +272,8 @@ async function book(request: Request, env: Env, shop: Shop, origin: 'link' | 'hu
     {
       appointment: {
         id,
+        status: 'confirmed',
+        version: 1,
         service: service.name,
         price: service.price,
         duration: service.duration,
@@ -273,14 +297,58 @@ async function api(request: Request, env: Env) {
   if (path === '/admin/login' && request.method === 'POST')
     return login(request, env, shop, adminPath);
   if (path.startsWith('/admin/')) await requireAdmin(request, env, shop);
+  if (path === '/admin/schedule' && request.method === 'GET')
+    return json(await scheduleView(env.DB, shop));
+  if (path === '/admin/schedule/preview' && request.method === 'POST')
+    return json(await previewSchedule(env.DB, shop, await body(request, 16384)));
+  if (path === '/admin/schedule/save' && request.method === 'POST')
+    return json(await saveSchedule(env.DB, shop, await body(request, 16384)));
+  const mutation = path.match(/^\/admin\/bookings\/([^/]+)\/(reschedule|cancel)$/);
+  if (mutation && request.method === 'POST')
+    return json(
+      await mutateAppointment(
+        env.DB,
+        shop,
+        mutation[1],
+        mutation[2] as 'reschedule' | 'cancel',
+        await body(request),
+      ),
+    );
   if (path === '/services' && request.method === 'GET')
     return json({ shop, services: await getServices(env.DB, shop.id) });
   if (path === '/' && request.method === 'GET') return json({ shop });
   if ((path === '/availability' || path === '/admin/availability') && request.method === 'GET') {
     const date = url.searchParams.get('date');
     validateDate(date, Date.now(), shop.timezone);
+    const appointmentId =
+      path === '/admin/availability' ? url.searchParams.get('appointmentId') : null;
+    if (appointmentId) {
+      const appointment = await getAppointment(env.DB, shop, appointmentId);
+      if (appointment.status !== 'confirmed')
+        throw new ApiError(409, 'A reserva já foi cancelada.');
+      return json({
+        date,
+        slots: await available(
+          env.DB,
+          shop,
+          date,
+          appointment.duration_minutes,
+          'hub',
+          appointment.id,
+        ),
+      });
+    }
     const service = await getService(env.DB, shop.id, url.searchParams.get('serviceId') || '');
-    return json({ date, slots: await available(env.DB, shop, date, service.duration) });
+    return json({
+      date,
+      slots: await available(
+        env.DB,
+        shop,
+        date,
+        service.duration,
+        path.startsWith('/admin/') ? 'hub' : 'link',
+      ),
+    });
   }
   if (path === '/bookings' && request.method === 'POST') return book(request, env, shop, 'link');
   if (path === '/admin/bookings' && request.method === 'POST')
@@ -297,24 +365,27 @@ async function api(request: Request, env: Env) {
   }
   if (path === '/admin/bookings' && request.method === 'GET') {
     const date = url.searchParams.get('date');
-    validateDate(date, Date.now(), shop.timezone);
+    if (
+      typeof date !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+      !Number.isFinite(Date.parse(`${date}T12:00:00Z`)) ||
+      new Date(`${date}T12:00:00Z`).toISOString().slice(0, 10) !== date
+    )
+      throw new ApiError(400, 'Data inválida.');
+    const status = url.searchParams.get('status') || 'confirmed';
+    if (!['confirmed', 'cancelled', 'all'].includes(status))
+      throw new ApiError(400, 'Filtro de situação inválido.');
     const [open, close] = dayBounds(date, shop.timezone);
     const { results } = await env.DB.prepare(
-      'SELECT id,customer_id,customer_name,customer_phone,service_name,price_label,duration_minutes,starts_at,ends_at,origin FROM appointments WHERE shop_id = ? AND starts_at >= ? AND starts_at < ? ORDER BY starts_at',
+      `SELECT ${appointmentColumns} FROM appointments WHERE shop_id = ? AND starts_at >= ? AND starts_at < ? AND (?='all' OR status=?) ORDER BY starts_at`,
     )
-      .bind(shop.id, open, close)
+      .bind(shop.id, open, close, status, status)
       .all();
     return json({ appointments: results });
   }
   const bookingDetail = path.match(/^\/admin\/bookings\/([^/]+)$/);
   if (bookingDetail && request.method === 'GET') {
-    const appointment = await env.DB.prepare(
-      'SELECT id,customer_id,customer_name,customer_phone,service_name,price_label,duration_minutes,starts_at,ends_at,origin FROM appointments WHERE shop_id = ? AND id = ?',
-    )
-      .bind(shop.id, bookingDetail[1])
-      .first();
-    if (!appointment) throw new ApiError(404, 'Reserva não encontrada.');
-    return json({ appointment });
+    return json(await appointmentDetail(env.DB, shop, bookingDetail[1]));
   }
   if (path === '/admin/customers' && request.method === 'GET') {
     const after = url.searchParams.get('after') || '';

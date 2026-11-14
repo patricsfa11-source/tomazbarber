@@ -1,4 +1,6 @@
 import './style.css';
+import { createAgendaManagement } from './agenda-management';
+import type { AppointmentRecord } from '../calendar';
 import {
   addDays,
   dateLabel as formatDate,
@@ -25,7 +27,9 @@ const state = {
   shop: null as Shop | null,
   customers: [] as Customer[],
   customerCursor: null as string | null,
-  hubView: 'agenda' as 'agenda' | 'customers',
+  hubView: 'agenda' as 'agenda' | 'customers' | 'settings',
+  agendaStatus: 'confirmed' as 'confirmed' | 'all',
+  notice: '',
   services: [] as Service[],
   serviceId: 'corte',
   serviceQuery: '',
@@ -58,16 +62,7 @@ interface Receipt {
   startsAt: number;
   endsAt: number;
 }
-interface AgendaItem {
-  id: string;
-  customer_name: string;
-  customer_phone: string;
-  service_name: string;
-  price_label: string;
-  starts_at: number;
-  ends_at: number;
-  origin: string;
-}
+type AgendaItem = AppointmentRecord;
 class RequestError extends Error {
   constructor(
     public status: number,
@@ -200,7 +195,7 @@ function datesView(): string {
                   : '';
               })
               .join('')
-          : `<div class="empty"><strong>Nenhum horário disponível.</strong><p>${!state.shop?.hours.some((h) => h.weekday === new Date(`${state.date}T12:00:00Z`).getUTCDay()) ? 'Este estabelecimento está fechado nesta data.' : 'Os horários deste dia já passaram ou estão ocupados.'} Escolha outra data.</p></div>`
+          : `<div class="empty"><strong>Nenhum horário disponível.</strong><p>Não há uma faixa livre para este serviço nesta data. Escolha outra data.</p></div>`
     }</div>
     <div class="actions"><button class="text-button" data-action="back">← Voltar</button><button class="primary" data-action="next" ${!state.startsAt || state.loading ? 'disabled' : ''}>Continuar <span aria-hidden="true">→</span></button></div>`;
 }
@@ -236,11 +231,11 @@ function renderLogin(): void {
 function renderAgenda(): void {
   const today = localDate();
   shell(`<section class="hub-heading"><div><span class="eyebrow">${escape(shopName())} / AGENDA DIÁRIA</span><h1>O dia começa aqui<span>.</span></h1><p class="muted">Reservas pelo link e encaixes, na mesma agenda.</p></div><button class="text-button" data-action="logout">Sair do hub →</button></section>
-    ${hubTabs()}<section class="agenda"><div class="agenda-toolbar"><div><label for="agenda-date">Data da agenda</label><input type="date" id="agenda-date" value="${state.date}" min="${today}" max="${addDays(today, 90)}"></div><button class="primary" data-action="new">+ Novo encaixe</button></div><div class="agenda-day"><h2>${escape(dateLabel(state.date))}</h2><div><span>${state.appointments.length} atendimento${state.appointments.length !== 1 ? 's' : ''}</span><button class="text-button" data-action="refresh">Atualizar ↻</button></div></div>${errorBox()}
-    <div aria-live="polite">${state.loading ? '<p class="empty">Carregando agenda…</p>' : state.appointments.length ? `<ol class="appointments">${state.appointments.map((a) => `<li><div class="appointment-time"><strong>${timeLabel(a.starts_at)}</strong><span>${timeLabel(a.ends_at)}</span></div><div class="appointment-info"><span class="tag">${a.origin === 'hub' ? 'ENCAIXE / HUB' : 'RESERVA / LINK'}</span><h3>${escape(a.customer_name)}</h3><p>${escape(a.service_name)} · ${escape(a.price_label)}</p><a href="tel:${escape(a.customer_phone)}">${escape(a.customer_phone)}</a></div><span class="status">Confirmado</span></li>`).join('')}</ol>` : '<div class="empty"><span class="empty-icon" aria-hidden="true">◷</span><h3>Um dia cheio de possibilidades.</h3><p>Nenhum atendimento nesta data. Os agendamentos aparecem aqui assim que são confirmados.</p></div>'}</div><p class="note">${zoneLabel()} · Atualize a agenda para consultar novas reservas.</p></section>`);
+    ${hubTabs()}<section class="agenda"><div class="agenda-toolbar"><div><label for="agenda-date">Data da agenda</label><input type="date" id="agenda-date" value="${state.date}" max="${addDays(today, 90)}"></div><button class="primary" data-action="new">+ Novo encaixe</button></div><div class="agenda-day"><h2>${escape(dateLabel(state.date))}</h2><div><span>${state.appointments.length} atendimento${state.appointments.length !== 1 ? 's' : ''}</span><button class="text-button" data-action="refresh">Atualizar ↻</button></div></div><nav class="agenda-filters" aria-label="Situação dos atendimentos"><button class="text-button" data-action="active-bookings" aria-pressed="${state.agendaStatus === 'confirmed'}">Ativos</button><button class="text-button" data-action="booking-history" aria-pressed="${state.agendaStatus === 'all'}">Histórico</button></nav>${errorBox()}${state.notice ? `<p class="success-note" role="status">${escape(state.notice)}</p>` : ''}
+    <div aria-live="polite">${state.loading ? '<p class="empty">Carregando agenda…</p>' : state.appointments.length ? `<ol class="appointments">${state.appointments.map((a) => `<li><div class="appointment-time"><strong>${timeLabel(a.starts_at)}</strong><span>${timeLabel(a.ends_at)}</span></div><div class="appointment-info"><span class="tag">${a.origin === 'hub' ? 'ENCAIXE / HUB' : 'RESERVA / LINK'}</span><h3>${escape(a.customer_name)}</h3><p>${escape(a.service_name)} · ${escape(a.price_label)}</p><a href="tel:${escape(a.customer_phone)}">${escape(a.customer_phone)}</a><div class="row-actions">${a.status === 'confirmed' ? `<button class="text-button" data-reschedule="${a.id}">Remarcar</button><button class="text-button danger-text" data-cancel="${a.id}">Cancelar</button>` : ''}<button class="text-button" data-history="${a.id}">Ver histórico</button></div></div><span class="status ${a.status === 'cancelled' ? 'cancelled' : ''}">${a.status === 'cancelled' ? 'Cancelado' : 'Confirmado'}</span></li>`).join('')}</ol>` : '<div class="empty"><span class="empty-icon" aria-hidden="true">◷</span><h3>Um dia cheio de possibilidades.</h3><p>Nenhum atendimento nesta data. Os agendamentos aparecem aqui assim que são confirmados.</p></div>'}</div><p class="note">${zoneLabel()} · Atualize a agenda para consultar novas reservas.</p></section>`);
 }
 function hubTabs(): string {
-  return `<nav class="hub-tabs" aria-label="Painel do estabelecimento"><button class="text-button" data-action="agenda-view" aria-pressed="${state.hubView === 'agenda'}">Agenda</button><button class="text-button" data-action="customers" aria-pressed="${state.hubView === 'customers'}">Clientes</button></nav>`;
+  return `<nav class="hub-tabs" aria-label="Painel do estabelecimento"><button class="text-button" data-action="agenda-view" aria-pressed="${state.hubView === 'agenda'}">Agenda</button><button class="text-button" data-action="customers" aria-pressed="${state.hubView === 'customers'}">Clientes</button><button class="text-button" data-action="settings" aria-pressed="${state.hubView === 'settings'}">Configurar agenda</button></nav>`;
 }
 function renderCustomers(): void {
   shell(
@@ -277,6 +272,7 @@ async function loadCustomers(more = false): Promise<void> {
 function render(): void {
   if (!isHub || state.booking) renderBooking();
   else if (!state.loggedIn) renderLogin();
+  else if (management.active()) management.render();
   else if (state.hubView === 'customers') renderCustomers();
   else renderAgenda();
 }
@@ -320,7 +316,7 @@ async function loadAgenda(): Promise<void> {
   render();
   try {
     const result = await api<{ appointments: AgendaItem[] }>(
-      `/api/admin/bookings?date=${state.date}`,
+      `/api/admin/bookings?date=${state.date}&status=${state.agendaStatus}`,
     );
     if (request === agendaRequest) state.appointments = result.appointments;
   } catch (error) {
@@ -339,6 +335,7 @@ function handleError(error: unknown): void {
     state.booking = false;
     state.customers = [];
     state.appointments = [];
+    management.close();
   }
 }
 function resetBooking(): void {
@@ -352,10 +349,40 @@ function resetBooking(): void {
   state.name = '';
   state.phone = '';
 }
+const management = createAgendaManagement({
+  api,
+  shell,
+  tabs: hubTabs,
+  escape,
+  shop: () => state.shop!,
+  localDate,
+  dateLabel,
+  timeLabel,
+  render,
+  onError: handleError,
+  onConfig: (config) => {
+    if (state.shop)
+      state.shop.hours = config.days
+        .filter((d) => d.enabled)
+        .map((d) => ({ weekday: d.weekday, opensAt: d.opensAt, closesAt: d.closesAt }));
+  },
+  setSettings: () => {
+    state.hubView = 'settings';
+    state.booking = false;
+  },
+  onDone: async (message, date) => {
+    state.notice = message;
+    state.date = date;
+    state.agendaStatus = 'confirmed';
+    await loadAgenda();
+  },
+});
 app.addEventListener('click', async (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
-  if (!button || button.disabled || state.busy) return;
+  if (!button || button.disabled || state.busy || management.busy) return;
   state.error = '';
+  state.notice = '';
+  if (isHub && state.loggedIn && (await management.click(button))) return;
   if (button.dataset.publicService) {
     state.serviceId = button.dataset.publicService;
     state.startsAt = 0;
@@ -410,6 +437,7 @@ app.addEventListener('click', async (event) => {
       focusStage();
       break;
     case 'new':
+      management.close();
       resetBooking();
       state.booking = true;
       render();
@@ -429,10 +457,25 @@ app.addEventListener('click', async (event) => {
       await loadAgenda();
       focusStage();
       break;
+    case 'settings':
+      await management.openSettings();
+      break;
+    case 'active-bookings':
+      management.close();
+      state.agendaStatus = 'confirmed';
+      await loadAgenda();
+      break;
+    case 'booking-history':
+      management.close();
+      state.agendaStatus = 'all';
+      await loadAgenda();
+      break;
     case 'agenda-view':
+      management.close();
       await loadAgenda();
       break;
     case 'customers':
+      management.close();
       await loadCustomers();
       break;
     case 'more-customers':
@@ -442,6 +485,7 @@ app.addEventListener('click', async (event) => {
       await loadAgenda();
       break;
     case 'logout':
+      management.close();
       try {
         await api('/api/admin/logout', {});
         state.loggedIn = false;
@@ -477,6 +521,7 @@ app.addEventListener('keydown', (event) => {
 });
 app.addEventListener('change', async (event) => {
   const input = event.target as HTMLInputElement;
+  if (isHub && state.loggedIn && (await management.change(input))) return;
   if (input.id === 'date' && input.value) {
     state.date = input.value;
     state.error = '';
@@ -490,6 +535,7 @@ app.addEventListener('change', async (event) => {
 });
 app.addEventListener('input', (event) => {
   const input = event.target as HTMLInputElement;
+  if (isHub && state.loggedIn && management.input(input)) return;
   if (input.id === 'service-search') {
     state.serviceQuery = input.value;
     const query = searchKey(input.value);
@@ -508,10 +554,11 @@ app.addEventListener('input', (event) => {
 });
 app.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (state.busy) return;
+  if (state.busy || management.busy) return;
   const form = event.target as HTMLFormElement;
   if (!form.reportValidity()) return;
   state.error = '';
+  if (isHub && state.loggedIn && (await management.submit(form))) return;
   if (form.id === 'login-form') {
     const password = form.querySelector<HTMLInputElement>('#password')!.value;
     state.busy = true;

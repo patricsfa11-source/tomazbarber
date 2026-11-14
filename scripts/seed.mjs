@@ -37,8 +37,8 @@ writeFileSync(
       .map(
         (x) => `
 INSERT INTO customers (shop_id,id,full_name,phone) VALUES ('${x.shop}','${x.id}-cliente','${x.name}','+5575999990000') ON CONFLICT(shop_id,phone) DO NOTHING;
-INSERT INTO appointments (id,shop_id,professional_id,customer_id,request_key,request_fingerprint,origin,customer_name,customer_phone,service_id,service_name,price_label,duration_minutes,starts_at,ends_at)
-SELECT '${x.id}','${x.shop}','principal',c.id,'demo-seed','seed-ficticio','hub','${x.name}','+5575999990000','${x.service}','${x.title}','${x.price}',${x.duration},${start},${start + x.duration * 60}
+INSERT INTO appointments (id,shop_id,professional_id,customer_id,request_key,request_fingerprint,origin,customer_name,customer_phone,service_id,service_name,price_label,duration_minutes,starts_at,ends_at,schedule_revision,booking_channel)
+SELECT '${x.id}','${x.shop}','principal',c.id,'demo-seed','seed-ficticio','hub','${x.name}','+5575999990000','${x.service}','${x.title}','${x.price}',${x.duration},${start},${start + x.duration * 60},(SELECT revision FROM schedule_settings WHERE shop_id='${x.shop}' AND professional_id='principal'),'hub'
 FROM customers c WHERE c.shop_id='${x.shop}' AND c.phone='+5575999990000'
 AND NOT EXISTS(SELECT 1 FROM appointments WHERE shop_id='${x.shop}' AND request_key='demo-seed')
 AND NOT EXISTS(SELECT 1 FROM appointments WHERE shop_id='${x.shop}' AND professional_id='principal' AND starts_at < ${start + x.duration * 60} AND ends_at > ${start});`,
