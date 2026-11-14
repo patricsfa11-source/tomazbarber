@@ -10,7 +10,9 @@ O transporte é substituído por um simulador nos testes. O código do adaptador
 
 As [capturas do painel no celular](previas-whatsapp/README.md) mostram o fluxo com dados e recibos simulados.
 
-**Envio real:** ainda depende de fornecer o destinatário de teste e configurar a conta Meta e seus secrets no ambiente privado. Um teste simulado aprovado ou uma resposta 2xx não é prova de entrega no WhatsApp. O primeiro teste real deve registrar seu identificador e aguardar o webhook de entrega ou a confirmação do destinatário; não incluir telefone completo ou token no PR público.
+**Piloto autorizado:** usar o remetente de teste da Meta e somente o destinatário informado pelo proprietário do teste, registrado em configuração privada. O dono da barbearia usa WhatsApp pessoal; o número oficial da TOMAZ BARBER será definido com ele antes da produção. O piloto não migra nem vincula esse WhatsApp pessoal.
+
+**Envio real:** o destinatário já foi informado; ainda falta configurar o acesso ao remetente de teste da Meta e seus secrets no ambiente privado. Um teste simulado aprovado ou uma resposta 2xx não é prova de entrega no WhatsApp. O primeiro teste real deve registrar seu identificador e aguardar o webhook de entrega ou a confirmação do destinatário; não incluir telefone completo ou token no PR público.
 
 ## Comportamento
 

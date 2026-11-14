@@ -8,6 +8,6 @@ O teste percorre o envio inicial `hello_world`, as confirmações de reserva pel
 | --------------------------------------------------------- | ------------------------------------------------------ |
 | ![Painel WhatsApp em 390 pixels](whatsapp-hub-mobile.png) | ![Painel WhatsApp em 320 pixels](whatsapp-hub-320.png) |
 
-O destinatário exibido é fictício e os envios gerais para clientes estão desativados. O primeiro envio real permanece dependente de configurar os secrets privados e informar o destinatário autorizado.
+O destinatário exibido é fictício e os envios gerais para clientes estão desativados. O destinatário real autorizado foi informado depois destas capturas e está registrado somente em configuração privada. O primeiro envio real depende de configurar o acesso ao remetente de teste da Meta e seus secrets.
 
 [Guia da integração e do teste real](../whatsapp.md) · [Modelos para aprovação na Meta](../whatsapp-modelos/README.md).
