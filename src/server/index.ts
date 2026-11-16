@@ -1,3 +1,4 @@
+import { managedServices, saveService } from './service-management';
 import { localDate, type Shop } from '../shared';
 import type { AppointmentRecord } from '../calendar';
 import {
@@ -126,7 +127,8 @@ function passwordFor(env: Env, shop: Shop): string | undefined {
       return;
     }
   } else if (shop.id === firstShop) password = env.ADMIN_PASSWORD;
-  return typeof password === 'string' && password.length >= 20 && password.length <= 200
+  const minLength = env.APP_STAGE === 'pilot' ? 8 : 20;
+  return typeof password === 'string' && password.length >= minLength && password.length <= 200
     ? password
     : undefined;
 }
@@ -247,14 +249,14 @@ async function book(request: Request, env: Env, shop: Shop, origin: 'link' | 'hu
   try {
     // O trigger SQL ocupa todos os segmentos atomicamente. A consulta prévia
     // de disponibilidade nunca é usada como proteção contra concorrência.
-    await env.DB.batch([
+    const written = await env.DB.batch([
       env.DB.prepare(
         'INSERT INTO customers (shop_id,id,full_name,phone) VALUES (?,?,?,?) ON CONFLICT(shop_id,phone) DO NOTHING',
       ).bind(shop.id, crypto.randomUUID(), input.name, input.phone),
       env.DB.prepare(
         `INSERT INTO appointments
         (id,shop_id,professional_id,customer_id,request_key,request_fingerprint,origin,customer_name,customer_phone,service_id,service_name,price_label,duration_minutes,starts_at,ends_at,schedule_revision,booking_channel)
-        VALUES (?,?,?,(SELECT id FROM customers WHERE shop_id = ? AND phone = ?),?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        SELECT ?,?,?,(SELECT id FROM customers WHERE shop_id = ? AND phone = ?),?,?,?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM services WHERE shop_id=? AND id=? AND active=1 AND version=?)`,
       ).bind(
         id,
         shop.id,
@@ -274,8 +276,13 @@ async function book(request: Request, env: Env, shop: Shop, origin: 'link' | 'hu
         input.startsAt + service.duration * 60,
         config.revision,
         origin,
+        shop.id,
+        service.id,
+        service.version,
       ),
     ]);
+    if (!written[1].meta.changes)
+      throw new ApiError(409, 'O serviço mudou. Reabra o catálogo antes de reservar.');
   } catch (error) {
     const repeated = await existing();
     if (repeated) return replay(repeated);
@@ -416,6 +423,13 @@ async function api(request: Request, env: Env) {
   if (path === '/admin/login' && request.method === 'POST')
     return login(request, env, shop, adminPath);
   if (path.startsWith('/admin/')) await requireAdmin(request, env, shop);
+  if (path === '/admin/services' && request.method === 'GET')
+    return json({ services: await managedServices(env.DB, shop) });
+  if (path === '/admin/services' && request.method === 'POST')
+    return json(await saveService(env.DB, shop, undefined, await body(request, 8192)), 201);
+  const serviceEdit = path.match(/^\/admin\/services\/([a-z0-9-]+)$/);
+  if (serviceEdit && request.method === 'POST')
+    return json(await saveService(env.DB, shop, serviceEdit[1], await body(request, 8192)));
   if (path === '/admin/receipts' && request.method === 'GET')
     return json(await receiptReport(env.DB, shop, url));
   const financial = path.match(/^\/admin\/bookings\/([^/]+)\/(complete|payment)$/);

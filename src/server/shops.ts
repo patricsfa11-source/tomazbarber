@@ -25,17 +25,23 @@ export async function getServices(db: D1Database, shopId: string): Promise<Servi
   return (
     await db
       .prepare(
-        'SELECT id,name,duration,price,description FROM services WHERE shop_id = ? ORDER BY sort_order,id',
+        "SELECT id,name,duration,price || CASE WHEN payment_conditions='' THEN '' ELSE ' · ' || payment_conditions END AS price,description FROM services WHERE shop_id = ? AND active=1 ORDER BY sort_order,id",
       )
       .bind(shopId)
       .all<Service>()
   ).results;
 }
-export async function getService(db: D1Database, shopId: string, id: string): Promise<Service> {
+export async function getService(
+  db: D1Database,
+  shopId: string,
+  id: string,
+): Promise<Service & { version: number }> {
   const service = await db
-    .prepare('SELECT id,name,duration,price,description FROM services WHERE shop_id = ? AND id = ?')
+    .prepare(
+      "SELECT id,name,duration,price || CASE WHEN payment_conditions='' THEN '' ELSE ' · ' || payment_conditions END AS price,description,version FROM services WHERE shop_id = ? AND id = ? AND active=1",
+    )
     .bind(shopId, id)
-    .first<Service>();
+    .first<Service & { version: number }>();
   if (!service) throw new ApiError(400, 'Serviço inválido para este estabelecimento.');
   return service;
 }

@@ -2209,3 +2209,30 @@ input[type='checkbox'] {
     flex-wrap: wrap;
   }
 }
+
+.service-settings textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 12px;
+  border: 1px solid var(--line, #555);
+  border-radius: 10px;
+  background: #20211e;
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+.service-settings label {
+  display: grid;
+  gap: 8px;
+  margin-block: 16px;
+}
+.service-settings .check-label {
+  display: flex;
+  align-items: center;
+}
+.service-settings .check-label input {
+  width: auto;
+}
+.service-settings li {
+  overflow-wrap: anywhere;
+}

@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
+  outputDir: './test-results/browser',
   testDir: './tests/browser',
   workers: 1,
   use: {

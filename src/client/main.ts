@@ -3,6 +3,7 @@ import './style.css';
 import { createAgendaManagement } from './agenda-management';
 import { createMyBookings } from './my-bookings';
 import { createReservationAccess } from './reservation-access';
+import { createServiceManagement } from './service-management';
 import { createHubTools } from './hub-tools';
 import { copyText } from './clipboard';
 import { createReceipts } from './receipts';
@@ -42,7 +43,7 @@ const state = {
   shop: null as Shop | null,
   customers: [] as Customer[],
   customerCursor: null as string | null,
-  hubView: 'agenda' as 'agenda' | 'customers' | 'settings',
+  hubView: 'agenda' as 'agenda' | 'customers' | 'settings' | 'services',
   agendaStatus: 'confirmed' as 'confirmed' | 'all',
   notice: '',
   phoneVerification: false,
@@ -241,6 +242,13 @@ function confirmation(): string {
   return `<section class="confirmation"><span class="success-mark" aria-hidden="true">✓</span><span class="eyebrow">HORÁRIO GARANTIDO</span><h1>${isHub ? 'Encaixe confirmado.' : 'Nos vemos em breve.'}</h1><p>Seu horário está reservado em ${escape(shopName())}.</p><div class="confirmed-details"><span>${escape(dateLabel(localDate(new Date(r.startsAt * 1000))))}</span><strong>${timeLabel(r.startsAt)}</strong><h2>${escape(r.service)}</h2><p>${escape(r.price)} · ${r.duration} minutos</p><small>Reserva ${escape(r.id.slice(0, 8).toUpperCase())}</small></div><p class="muted">Chegue 10 minutos antes do horário. Sua confirmação está aqui na tela.</p>${r.manageUrl ? `<a class="primary my-receipt-link" href="${escape(r.manageUrl || customerPath)}" data-private-receipt-link>Consultar ou alterar esta reserva <span aria-hidden="true">→</span></a><button class="text-button" data-action="copy-private-link">Copiar link privado</button><p class="note private-link-note">Guarde este link. Quem tiver acesso a ele poderá consultar e alterar somente esta reserva.</p>` : ''}<p class="success-note" role="status" data-copy-status hidden></p><button class="${isHub ? 'primary' : 'text-button'}" data-action="restart">${isHub ? 'Voltar à agenda' : 'Fazer outra reserva'} <span aria-hidden="true">→</span></button></section>`;
 }
 function renderBooking(): void {
+  if (isHub && state.services.length === 0 && !state.receipt) {
+    shell(
+      `<section class="agenda"><h1>Nenhum serviço ativo.</h1><p>Ative ou cadastre um serviço para registrar novos agendamentos.</p><button class="primary" data-action="manage-services">Gerenciar serviços</button><button class="text-button" data-action="agenda">Voltar à agenda do hub</button></section>`,
+    );
+    return;
+  }
+
   if (state.receipt) {
     shell(confirmation());
     return;
@@ -265,7 +273,7 @@ function renderAgenda(): void {
     <div aria-live="polite">${state.loading ? '<p class="empty">Carregando agenda…</p>' : state.appointments.length ? `<ol class="appointments">${state.appointments.map((a) => `<li><div class="appointment-time"><strong>${timeLabel(a.starts_at)}</strong><span>${timeLabel(a.ends_at)}</span></div><div class="appointment-info"><span class="tag">${a.origin === 'hub' ? 'ENCAIXE / HUB' : 'RESERVA / LINK'}</span><h3>${escape(a.customer_name)}</h3><p>${escape(a.service_name)} · ${escape(a.price_label)}</p><a href="https://wa.me/${escape(a.customer_phone.replace(/\D/g, ''))}" target="_blank" rel="noopener noreferrer" aria-label="Conversar com ${escape(a.customer_name)} pelo WhatsApp">${escape(a.customer_phone)} · WhatsApp</a><div class="row-actions">${a.status === 'confirmed' && !a.completed_at ? `<button class="text-button" data-reschedule="${a.id}">Remarcar</button><button class="text-button danger-text" data-cancel="${a.id}">Cancelar</button>` : ''}<button class="text-button" data-history="${a.id}">Ver histórico</button>${a.status === 'confirmed' && !a.completed_at ? `<button class="text-button" data-complete="${a.id}" ${a.starts_at * 1000 > Date.now() ? 'disabled title="Disponível após o início do atendimento"' : ''}>Concluir atendimento</button>` : ''}<button class="text-button" data-payment="${a.id}">${a.payment_amount_cents != null ? 'Ver recebimento' : 'Registrar pagamento'}</button></div>${a.payment_amount_cents != null ? `<p class="agenda-payment">Recebido ${money(a.payment_amount_cents)} · ${paymentMethods[a.payment_method!]} · ${a.payment_paid_on!.split('-').reverse().join('/')}</p>` : '<p class="agenda-payment muted">Sem recebimento registrado</p>'}</div><span class="status ${a.status === 'cancelled' ? 'cancelled' : ''}">${a.status === 'cancelled' ? 'Cancelado' : a.completed_at ? 'Concluído' : 'Confirmado'}</span></li>`).join('')}</ol>` : '<div class="empty"><span class="empty-icon" aria-hidden="true">◷</span><h3>Um dia cheio de possibilidades.</h3><p>Nenhum atendimento nesta data. Os agendamentos aparecem aqui assim que são confirmados.</p></div>'}</div><p class="note">${zoneLabel()} · Atualize a agenda para consultar novas reservas.</p></section>`);
 }
 function hubTabs(): string {
-  return `<nav class="hub-tabs" aria-label="Painel do estabelecimento"><button class="text-button" data-action="agenda-view" aria-pressed="${state.hubView === 'agenda' && !receivables.active()}">Agenda</button><button class="text-button" data-action="customers" aria-pressed="${state.hubView === 'customers' && !receivables.active()}">Clientes</button><button class="text-button" data-action="settings" aria-pressed="${state.hubView === 'settings' && !receivables.active()}">Configurar agenda</button><button class="text-button" data-action="receipts" aria-pressed="${receivables.isReport()}">Recebimentos</button></nav>`;
+  return `<nav class="hub-tabs" aria-label="Painel do estabelecimento"><button class="text-button" data-action="agenda-view" aria-pressed="${state.hubView === 'agenda' && !receivables.active()}">Agenda</button><button class="text-button" data-action="customers" aria-pressed="${state.hubView === 'customers' && !receivables.active()}">Clientes</button><button class="text-button" data-action="settings" aria-pressed="${state.hubView === 'settings' && !receivables.active()}">Configurar agenda</button><button class="text-button" data-action="manage-services" aria-pressed="${serviceManagement.active()}">Serviços</button><button class="text-button" data-action="receipts" aria-pressed="${receivables.isReport()}">Recebimentos</button></nav>`;
 }
 function renderCustomers(): void {
   shell(
@@ -304,6 +312,7 @@ function render(): void {
   else if (isCustomer) myBookings.render();
   else if (!isHub || state.booking) renderBooking();
   else if (!state.loggedIn) renderLogin();
+  else if (serviceManagement.active()) serviceManagement.render();
   else if (receivables.active()) receivables.render();
   else if (management.active()) management.render();
   else if (state.hubView === 'customers') renderCustomers();
@@ -370,6 +379,7 @@ function handleError(error: unknown): void {
     state.appointments = [];
     management.close();
     receivables.close();
+    serviceManagement.close();
   }
 }
 function resetBooking(): void {
@@ -428,6 +438,25 @@ const receivables = createReceipts({
     await loadAgenda();
   },
 });
+const serviceManagement = createServiceManagement({
+  api,
+  shell,
+  tabs: hubTabs,
+  escape,
+  render,
+  onError: handleError,
+  prepare: () => {
+    management.close();
+    receivables.close();
+    state.booking = false;
+    state.hubView = 'services';
+  },
+  onSaved: (services) => {
+    state.services = services;
+    state.serviceId = services[0]?.id || '';
+    resetBooking();
+  },
+});
 const myBookings = createMyBookings({
   api,
   shell,
@@ -452,7 +481,15 @@ const reservationAccess = createReservationAccess({
 });
 app.addEventListener('click', async (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
-  if (!button || button.disabled || state.busy || management.busy || receivables.busy) return;
+  if (
+    !button ||
+    button.disabled ||
+    state.busy ||
+    management.busy ||
+    receivables.busy ||
+    serviceManagement.busy
+  )
+    return;
   if (isPrivate) {
     await reservationAccess.click(button);
     return;
@@ -464,6 +501,7 @@ app.addEventListener('click', async (event) => {
   }
   state.error = '';
   state.notice = '';
+  if (isHub && state.loggedIn && (await serviceManagement.click(button))) return;
   if (isHub && state.loggedIn && (await receivables.click(button))) return;
   if (
     isHub &&
@@ -698,7 +736,7 @@ app.addEventListener('input', (event) => {
 });
 app.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (state.busy || management.busy || receivables.busy) return;
+  if (state.busy || management.busy || receivables.busy || serviceManagement.busy) return;
   const form = event.target as HTMLFormElement;
   if (!form.reportValidity()) return;
   if (isCustomer) {
@@ -706,6 +744,7 @@ app.addEventListener('submit', async (event) => {
     return;
   }
   state.error = '';
+  if (isHub && state.loggedIn && (await serviceManagement.submit(form))) return;
   if (isHub && state.loggedIn && (await receivables.submit(form))) return;
   if (isHub && state.loggedIn && (await management.submit(form))) return;
   if (form.id === 'register-customer') {
