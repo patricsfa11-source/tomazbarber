@@ -20,7 +20,7 @@ Permanece a regra de cancelamento sem custo com pelo menos duas horas de anteced
 
 ## Hub no celular
 
-Cada `/s/<slug>/hub` mantém agenda diária, encaixes, clientes e configurações de disponibilidade. O cadastro de cliente pode ser feito sem reservar horário. **Marcar horário** preenche o encaixe com os dados escolhidos. Um telefone já cadastrado com outro nome não é sobrescrito silenciosamente.
+Cada `/s/<slug>/hub` mantém agenda diária, encaixes, clientes e configurações de disponibilidade. O cadastro de cliente pode ser feito sem reservar horário. **Marcar horário** preenche o encaixe com os dados escolhidos. Um telefone já cadastrado com outro nome não é sobrescrito silenciosamente. O nome completo e o telefone aparecem na agenda e na lista de clientes. Tocar no número abre a conversa com aquele cliente no WhatsApp, sem mensagem preenchida ou envio automático; o barbeiro escreve e envia pela própria conta conectada no aparelho.
 
 **Divulgar agendamento** oferece o link público daquele estabelecimento, botão para copiá-lo, compartilhamento manual pelo WhatsApp e QR Code em PNG. O barbeiro escolhe o destinatário e confirma no WhatsApp. O QR contém somente o link público, sem clientes, senhas ou links privados. TOMAZ e Aurora têm links e QR Codes diferentes.
 
