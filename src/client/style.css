@@ -1642,7 +1642,11 @@ footer small {
   border-radius: 50%;
   background: #282318;
   color: var(--gold);
-  font-size: 1.2rem;
+}
+.shop-service-icon svg {
+  display: block;
+  width: 24px;
+  height: 24px;
 }
 .shop-service-info h2 {
   margin-bottom: 5px;

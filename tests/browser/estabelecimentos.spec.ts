@@ -52,6 +52,10 @@ test('links próprios preservam a TOMAZ, mostram catálogos e horários certos e
     await expect(page.getByRole('heading', { name: shop.name, exact: true })).toBeVisible();
     await expect(page).toHaveTitle(`${shop.name} · Seu próximo horário`);
     await expect(page.locator('[data-public-service]')).toHaveCount(shop.count);
+    const icons = page.locator('.shop-service-icon svg');
+    await expect(icons).toHaveCount(shop.count);
+    const shapes = await icons.evaluateAll((elements) => elements.map((icon) => icon.innerHTML));
+    expect(new Set(shapes).size).toBe(shop.count);
     if (shop.slug === 'tomaz-barber') {
       await expect(page.locator('.shop-cover img')).toBeVisible();
       await expect
