@@ -3,7 +3,7 @@ INSERT INTO shops (id,slug,name,timezone,logo_url,description)
 VALUES ('salao-aurora','salao-aurora','Salão Aurora','America/Bahia',NULL,'Salão fictício para testes.')
 ON CONFLICT(id) DO NOTHING;
 INSERT INTO professionals VALUES ('salao-aurora','principal','Aurora Exemplo') ON CONFLICT(shop_id,id) DO NOTHING;
-INSERT INTO services VALUES
+INSERT INTO services(shop_id,id,name,duration,price,description,sort_order) VALUES
   ('salao-aurora','corte','Corte e finalização',60,'R$ 55,00','Serviço fictício do Salão Aurora.',1),
   ('salao-aurora','escova','Escova',30,'R$ 40,00','Escova fictícia para demonstração.',2)
 ON CONFLICT(shop_id,id) DO NOTHING;

@@ -5,6 +5,11 @@ export interface Service {
   price: string;
   description: string;
 }
+export interface ManagedService extends Service {
+  active: boolean;
+  paymentConditions: string;
+  version: number;
+}
 export interface Shop {
   id: string;
   slug: string;
