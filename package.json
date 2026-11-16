@@ -13,7 +13,13 @@
     "db:seed": "node scripts/seed.mjs",
     "dev:e2e": "npm run build && node scripts/reset-e2e.mjs && wrangler d1 migrations apply tomazbarber-dev --local --persist-to work/e2e && wrangler d1 execute tomazbarber-dev --local --persist-to work/e2e --file fixtures/0001_salao_aurora.sql && wrangler dev --config wrangler.e2e.jsonc --ip 127.0.0.1 --port 8788 --persist-to work/e2e --var 'ADMIN_PASSWORDS:{\"tomaz-barber\":\"senha-ficticia-e2e-local-123\",\"salao-aurora\":\"senha-ficticia-aurora-e2e-123\"}'",
     "test:browser": "playwright test",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "pilot:prepare": "node scripts/pilot.mjs prepare",
+    "pilot:local": "node scripts/pilot.mjs local",
+    "pilot:deploy": "node scripts/pilot.mjs deploy",
+    "pilot:links": "node scripts/pilot.mjs links",
+    "pilot:dry-run": "npm run build && wrangler deploy --config wrangler.pilot.json --dry-run --outdir work/pilot/dry-run",
+    "test:pilot": "playwright test --config playwright.pilot.config.ts"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.8.2",

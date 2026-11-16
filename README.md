@@ -11,6 +11,7 @@ Sistema de agendamento com dados separados por estabelecimento. A TOMAZ BARBER �
 - [Meus horários](docs/meus-horarios.md) — proposta de verificação pelo WhatsApp, acesso privado do cliente e regras para alterações.
 - [Cliente e hub instalável](docs/cliente-hub.md) — reserva por link privado, instalação, cadastro, divulgação e validação sem Meta.
 - [Recebimentos e relatórios](docs/recebimentos.md) — conclusão separada do pagamento e caixa pela data recebida, por estabelecimento.
+- [Piloto no Cloudflare](docs/piloto-cloudflare.md) — Worker/D1 exclusivos de teste, acesso à conta, deploy, links/QR e roteiro nos celulares.
 
 ## Primeira etapa implementada
 

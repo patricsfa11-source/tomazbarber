@@ -43,6 +43,7 @@ export interface Env extends CustomerAuthEnv {
   ASSETS: Fetcher;
   ADMIN_PASSWORD?: string;
   ADMIN_PASSWORDS?: string;
+  APP_STAGE?: string;
 }
 interface BookingInput {
   serviceId: string;
@@ -580,6 +581,10 @@ export default {
         ? await api(request, env)
         : await page(request, env);
       const secured = new Response(response.body, response);
+      if (env.APP_STAGE === 'pilot') {
+        secured.headers.set('X-Tomaz-Environment', 'pilot');
+        secured.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+      }
       secured.headers.set('X-Frame-Options', 'DENY');
       secured.headers.set('Referrer-Policy', 'no-referrer');
       if (/\/(hub|reserva\/)/.test(new URL(request.url).pathname))
