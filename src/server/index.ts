@@ -127,7 +127,8 @@ function passwordFor(env: Env, shop: Shop): string | undefined {
       return;
     }
   } else if (shop.id === firstShop) password = env.ADMIN_PASSWORD;
-  return typeof password === 'string' && password.length >= 20 && password.length <= 200
+  const minLength = env.APP_STAGE === 'pilot' ? 8 : 20;
+  return typeof password === 'string' && password.length >= minLength && password.length <= 200
     ? password
     : undefined;
 }
