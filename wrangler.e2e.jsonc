@@ -18,6 +18,7 @@
     },
   ],
   "vars": {
+    "WHATSAPP_MODE": "off",
     "CUSTOMER_AUTH_SECRET": "segredo-ficticio-de-verificacao-exclusivo-e2e-123",
   },
   "services": [{ "binding": "VERIFICATION_SENDER", "service": "tomaz-whatsapp-simulado" }],

@@ -1,6 +1,9 @@
 import './style.css';
 import { createAgendaManagement } from './agenda-management';
 import { createMyBookings } from './my-bookings';
+import { createReservationAccess } from './reservation-access';
+import { createHubTools } from './hub-tools';
+import { copyText } from './clipboard';
 import type { AppointmentRecord } from '../calendar';
 import {
   addDays,
@@ -14,7 +17,9 @@ import {
 } from '../shared';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
-const route = location.pathname.match(/^\/s\/([^/]+)(\/hub|\/meus-horarios)?\/?$/);
+const route = location.pathname.match(
+  /^\/s\/([^/]+)(\/hub|\/meus-horarios|\/reserva\/[a-f0-9-]{36})?\/?$/,
+);
 const shopSlug = route ? route[1] : 'tomaz-barber';
 const publicPath = `/s/${encodeURIComponent(shopSlug)}`;
 const hubPath = `${publicPath}/hub`;
@@ -22,6 +27,8 @@ const apiRoot = `/api/shops/${encodeURIComponent(shopSlug)}`;
 const isHub = route?.[2] === '/hub' || location.pathname.replace(/\/$/, '') === '/hub';
 const isCustomer =
   route?.[2] === '/meus-horarios' || location.pathname.replace(/\/$/, '') === '/meus-horarios';
+const privateId = route?.[2]?.match(/^\/reserva\/([a-f0-9-]{36})$/)?.[1] || '';
+const isPrivate = Boolean(privateId);
 const customerPath = `${publicPath}/meus-horarios`;
 let timezone = defaultTimezone;
 const localDate = (date = new Date()) => formatLocalDate(date, timezone);
@@ -34,6 +41,10 @@ const state = {
   hubView: 'agenda' as 'agenda' | 'customers' | 'settings',
   agendaStatus: 'confirmed' as 'confirmed' | 'all',
   notice: '',
+  phoneVerification: false,
+  customerForm: false,
+  newCustomerName: '',
+  newCustomerPhone: '',
   services: [] as Service[],
   serviceId: 'corte',
   serviceQuery: '',
@@ -65,6 +76,7 @@ interface Receipt {
   duration: number;
   startsAt: number;
   endsAt: number;
+  manageUrl: string | null;
 }
 type AgendaItem = AppointmentRecord;
 class RequestError extends Error {
@@ -83,11 +95,19 @@ const escape = (value: unknown) =>
 const selected = () => state.services.find((s) => s.id === state.serviceId)!;
 async function api<T>(path: string, data?: unknown): Promise<T> {
   const scopedPath = path.startsWith('/api/') ? `${apiRoot}${path.slice(4)}` : path;
-  const response = await fetch(scopedPath, {
-    method: data === undefined ? 'GET' : 'POST',
-    headers: data === undefined ? {} : { 'Content-Type': 'application/json' },
-    body: data === undefined ? undefined : JSON.stringify(data),
-  });
+  let response: Response;
+  try {
+    response = await fetch(scopedPath, {
+      method: data === undefined ? 'GET' : 'POST',
+      headers: data === undefined ? {} : { 'Content-Type': 'application/json' },
+      body: data === undefined ? undefined : JSON.stringify(data),
+    });
+  } catch {
+    throw new RequestError(
+      0,
+      'Não foi possível confirmar a resposta. Confira a conexão e tente novamente com os mesmos dados.',
+    );
+  }
   const result = (await response.json()) as T & { error?: string };
   if (!response.ok)
     throw new RequestError(
@@ -114,8 +134,9 @@ function publicCover(): string {
 }
 function shell(content: string): void {
   app.innerHTML = `<div class="demo-bar">AMBIENTE DE TESTE <span>·</span> Utilize apenas dados fictícios</div>
-    ${!isHub && !isCustomer && state.step === 1 ? publicCover() : `<header>${brand()}<nav aria-label="Navegação principal"><a href="${publicPath}" ${!isHub && !isCustomer ? 'aria-current="page"' : ''}>Agendar</a><a href="${customerPath}" ${isCustomer ? 'aria-current="page"' : ''}>Meus horários</a>${isCustomer ? '' : `<a href="${hubPath}" ${isHub ? 'aria-current="page"' : ''}>${shopSlug === 'tomaz-barber' ? 'Hub do barbeiro' : 'Painel do salão'} <span aria-hidden="true">→</span></a>`}</nav></header>`}
-    <main${!isHub && !isCustomer && state.step === 1 ? ' class="shop-main"' : ''}>${content}</main><footer><span>${escape(shopName())}</span><p>${escape(shopHours())}<br>${zoneLabel()}</p><small>Feito para cuidar do seu tempo.</small></footer>`;
+    ${!isHub && !isCustomer && !isPrivate && state.step === 1 ? publicCover() : `<header>${brand()}<nav aria-label="Navegação principal"><a href="${publicPath}" ${!isHub && !isCustomer && !isPrivate ? 'aria-current="page"' : ''}>Agendar</a><a href="${customerPath}" ${isCustomer ? 'aria-current="page"' : ''}>Meus horários</a>${isCustomer ? '' : `<a href="${hubPath}" ${isHub ? 'aria-current="page"' : ''}>${shopSlug === 'tomaz-barber' ? 'Hub do barbeiro' : 'Painel do salão'} <span aria-hidden="true">→</span></a>`}</nav></header>`}
+    <main${!isHub && !isCustomer && !isPrivate && state.step === 1 ? ' class="shop-main"' : ''}>${isHub ? hubTools.render() : ''}${content}</main><footer><span>${escape(shopName())}</span><p>${escape(shopHours())}<br>${zoneLabel()}</p><small>Feito para cuidar do seu tempo.</small></footer>`;
+  if (isHub) hubTools.afterRender();
 }
 const errorBox = () =>
   `<div class="error" role="alert" ${state.error ? '' : 'hidden'}>${escape(state.error)}</div>`;
@@ -208,12 +229,12 @@ function detailsView(): string {
   return `<span class="eyebrow">03 / REVISE E CONFIRME</span><h2>Quase tudo pronto.</h2><p class="muted">${isHub ? 'Informe os dados do cliente para registrar o encaixe.' : 'Só precisamos de dois dados para reservar seu horário.'}</p>
     <form id="booking-form"><div class="fields"><label for="name">Nome completo<input id="name" name="name" autocomplete="name" required minlength="5" maxlength="100" value="${escape(state.name)}" placeholder="Ex.: João da Silva"></label><label for="phone">Celular com DDD<input id="phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" required maxlength="20" value="${escape(state.phone)}" placeholder="(75) 99999-9999"></label></div>
     <div class="review"><h3>Confira sua reserva</h3><p><strong>${escape(selected().name)}</strong><span>${escape(selected().price)}</span></p><p>${escape(dateLabel(state.date))}<strong>${timeLabel(state.startsAt)} · ${selected().duration} min</strong></p></div>
-    <div class="rules"><h3>Para o seu atendimento</h3><ul><li>Chegue 10 minutos antes. A tolerância é de 10 minutos após o início.</li><li>Cancelamento sem custo com pelo menos 2 horas de antecedência.</li><li>Em caso de falta, taxa de R$ 15,00 tratada presencialmente.</li></ul><p>Depois de reservar, acesse Meus horários e verifique seu celular pelo WhatsApp para consultar ou alterar suas reservas. Com menos de 2 horas, combine alterações diretamente com o salão.</p></div>
+    <div class="rules"><h3>Para o seu atendimento</h3><ul><li>Chegue 10 minutos antes. A tolerância é de 10 minutos após o início.</li><li>Cancelamento sem custo com pelo menos 2 horas de antecedência.</li><li>Em caso de falta, taxa de R$ 15,00 tratada presencialmente.</li></ul><p>Depois de reservar, guarde o link privado exibido na confirmação para consultar ou alterar este atendimento pelo navegador. Com menos de 2 horas, combine alterações diretamente com o salão.</p></div>
     <div class="actions"><button type="button" class="text-button" data-action="back" ${state.busy ? 'disabled' : ''}>← Voltar</button><button type="submit" class="primary" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Confirmando…' : isHub ? 'Confirmar encaixe' : 'Confirmar reserva'} <span aria-hidden="true">✓</span></button></div></form>`;
 }
 function confirmation(): string {
   const r = state.receipt!;
-  return `<section class="confirmation"><span class="success-mark" aria-hidden="true">✓</span><span class="eyebrow">HORÁRIO GARANTIDO</span><h1>${isHub ? 'Encaixe confirmado.' : 'Nos vemos em breve.'}</h1><p>Seu horário está reservado em ${escape(shopName())}.</p><div class="confirmed-details"><span>${escape(dateLabel(localDate(new Date(r.startsAt * 1000))))}</span><strong>${timeLabel(r.startsAt)}</strong><h2>${escape(r.service)}</h2><p>${escape(r.price)} · ${r.duration} minutos</p><small>Reserva ${escape(r.id.slice(0, 8).toUpperCase())}</small></div><p class="muted">Chegue 10 minutos antes do horário.<br>Nenhuma mensagem real de WhatsApp é enviada neste teste.</p>${!isHub ? `<a class="primary my-receipt-link" href="${customerPath}">Ver meus horários <span aria-hidden="true">→</span></a>` : ''}<button class="${isHub ? 'primary' : 'text-button'}" data-action="restart">${isHub ? 'Voltar à agenda' : 'Fazer outra reserva'} <span aria-hidden="true">→</span></button></section>`;
+  return `<section class="confirmation"><span class="success-mark" aria-hidden="true">✓</span><span class="eyebrow">HORÁRIO GARANTIDO</span><h1>${isHub ? 'Encaixe confirmado.' : 'Nos vemos em breve.'}</h1><p>Seu horário está reservado em ${escape(shopName())}.</p><div class="confirmed-details"><span>${escape(dateLabel(localDate(new Date(r.startsAt * 1000))))}</span><strong>${timeLabel(r.startsAt)}</strong><h2>${escape(r.service)}</h2><p>${escape(r.price)} · ${r.duration} minutos</p><small>Reserva ${escape(r.id.slice(0, 8).toUpperCase())}</small></div><p class="muted">Chegue 10 minutos antes do horário. Sua confirmação está aqui na tela.</p>${r.manageUrl ? `<a class="primary my-receipt-link" href="${escape(r.manageUrl || customerPath)}" data-private-receipt-link>Consultar ou alterar esta reserva <span aria-hidden="true">→</span></a><button class="text-button" data-action="copy-private-link">Copiar link privado</button><p class="note private-link-note">Guarde este link. Quem tiver acesso a ele poderá consultar e alterar somente esta reserva.</p>` : ''}<p class="success-note" role="status" data-copy-status hidden></p><button class="${isHub ? 'primary' : 'text-button'}" data-action="restart">${isHub ? 'Voltar à agenda' : 'Fazer outra reserva'} <span aria-hidden="true">→</span></button></section>`;
 }
 function renderBooking(): void {
   if (state.receipt) {
@@ -244,7 +265,7 @@ function hubTabs(): string {
 }
 function renderCustomers(): void {
   shell(
-    `<section class="hub-heading"><div><span class="eyebrow">${escape(shopName())} / CLIENTES</span><h1>Seus clientes<span>.</span></h1><p class="muted">Clientes cadastrados nos agendamentos de ${escape(shopName())}.</p></div><button class="text-button" data-action="logout">Sair do hub →</button></section>${hubTabs()}<section class="agenda">${errorBox()}${state.loading ? '<p class="empty" role="status">Carregando clientes…</p>' : state.customers.length ? `<ul class="customers">${state.customers.map((c) => `<li><h3>${escape(c.full_name)}</h3><a href="tel:${escape(c.phone)}">${escape(c.phone)}</a></li>`).join('')}</ul>` : '<p class="empty">Nenhum cliente cadastrado neste estabelecimento.</p>'}${state.customerCursor ? '<button class="primary" data-action="more-customers">Carregar mais clientes</button>' : ''}</section>`,
+    `<section class="hub-heading"><div><span class="eyebrow">${escape(shopName())} / CLIENTES</span><h1>Seus clientes<span>.</span></h1><p class="muted">Clientes cadastrados nos agendamentos de ${escape(shopName())}.</p></div><button class="text-button" data-action="logout">Sair do hub →</button></section>${hubTabs()}<section class="agenda">${errorBox()}${state.notice ? `<p class="success-note" role="status">${escape(state.notice)}</p>` : ''}<button class="primary" data-action="customer-form">${state.customerForm ? 'Fechar cadastro' : '+ Cadastrar cliente'}</button>${state.customerForm ? `<form id="register-customer" class="customer-register settings-card"><h2>Cadastrar cliente</h2><label for="customer-name">Nome completo do cliente<input id="customer-name" required minlength="5" maxlength="100" autocomplete="name" value="${escape(state.newCustomerName)}"></label><label for="customer-phone">Celular do cliente com DDD<input id="customer-phone" type="tel" autocomplete="tel" required maxlength="20" value="${escape(state.newCustomerPhone)}"></label><button class="primary" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Salvando…' : 'Salvar cliente'}</button></form>` : ''}${state.loading ? '<p class="empty" role="status">Carregando clientes…</p>' : state.customers.length ? `<ul class="customers">${state.customers.map((c) => `<li><h3>${escape(c.full_name)}</h3><a href="tel:${escape(c.phone)}">${escape(c.phone)}</a><button class="text-button" data-customer-book="${escape(c.id)}">Marcar horário</button></li>`).join('')}</ul>` : '<p class="empty">Nenhum cliente cadastrado neste estabelecimento.</p>'}${state.customerCursor ? '<button class="primary" data-action="more-customers">Carregar mais clientes</button>' : ''}</section>`,
   );
 }
 let customerRequest = 0;
@@ -275,7 +296,8 @@ async function loadCustomers(more = false): Promise<void> {
   }
 }
 function render(): void {
-  if (isCustomer) myBookings.render();
+  if (isPrivate) reservationAccess.render();
+  else if (isCustomer) myBookings.render();
   else if (!isHub || state.booking) renderBooking();
   else if (!state.loggedIn) renderLogin();
   else if (management.active()) management.render();
@@ -383,10 +405,36 @@ const management = createAgendaManagement({
     await loadAgenda();
   },
 });
-const myBookings = createMyBookings({ api, shell, escape, shop: () => state.shop!, publicPath });
+const myBookings = createMyBookings({
+  api,
+  shell,
+  escape,
+  shop: () => state.shop!,
+  publicPath,
+  verificationAvailable: () => state.phoneVerification,
+});
+const hubTools = createHubTools({
+  shop: () => state.shop,
+  publicPath,
+  escape,
+  isLoggedIn: () => state.loggedIn,
+});
+const reservationAccess = createReservationAccess({
+  id: privateId,
+  shop: () => state.shop!,
+  api,
+  shell,
+  escape,
+  publicPath,
+});
 app.addEventListener('click', async (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
   if (!button || button.disabled || state.busy || management.busy) return;
+  if (isPrivate) {
+    await reservationAccess.click(button);
+    return;
+  }
+  if (isHub && (await hubTools.click(button, render))) return;
   if (isCustomer) {
     await myBookings.click(button);
     return;
@@ -427,7 +475,39 @@ app.addEventListener('click', async (event) => {
       ?.focus({ preventScroll: true });
     return;
   }
+  if (button.dataset.customerBook) {
+    const c = state.customers.find((c) => c.id === button.dataset.customerBook);
+    if (c) {
+      management.close();
+      resetBooking();
+      state.name = c.full_name;
+      state.phone = c.phone;
+      state.booking = true;
+      render();
+      focusStage();
+    }
+    return;
+  }
   switch (button.dataset.action) {
+    case 'copy-private-link':
+      if (state.receipt?.manageUrl) {
+        try {
+          await copyText(new URL(state.receipt.manageUrl, location.origin).href);
+          const n = document.querySelector<HTMLElement>('[data-copy-status]');
+          if (n) {
+            n.textContent = 'Link privado copiado. Guarde com cuidado.';
+            n.hidden = false;
+          }
+        } catch (error) {
+          handleError(error);
+          render();
+        }
+      }
+      break;
+    case 'customer-form':
+      state.customerForm = !state.customerForm;
+      render();
+      break;
     case 'services':
     case 'details':
       state.shopDetails = button.dataset.action === 'details';
@@ -532,6 +612,10 @@ app.addEventListener('keydown', (event) => {
 });
 app.addEventListener('change', async (event) => {
   const input = event.target as HTMLInputElement;
+  if (isPrivate) {
+    await reservationAccess.change(input);
+    return;
+  }
   if (isCustomer) {
     await myBookings.change(input);
     return;
@@ -550,6 +634,8 @@ app.addEventListener('change', async (event) => {
 });
 app.addEventListener('input', (event) => {
   const input = event.target as HTMLInputElement;
+  if (input.id === 'customer-name') state.newCustomerName = input.value;
+  if (input.id === 'customer-phone') state.newCustomerPhone = input.value;
   if (isCustomer) {
     myBookings.input(input);
     return;
@@ -582,6 +668,27 @@ app.addEventListener('submit', async (event) => {
   }
   state.error = '';
   if (isHub && state.loggedIn && (await management.submit(form))) return;
+  if (form.id === 'register-customer') {
+    state.busy = true;
+    render();
+    try {
+      await api('/api/admin/customers', {
+        name: state.newCustomerName,
+        phone: state.newCustomerPhone,
+      });
+      state.newCustomerName = '';
+      state.newCustomerPhone = '';
+      state.customerForm = false;
+      state.notice = 'Cliente cadastrado. Você já pode marcar um horário.';
+      await loadCustomers();
+    } catch (error) {
+      handleError(error);
+    } finally {
+      state.busy = false;
+      render();
+    }
+    return;
+  }
   if (form.id === 'login-form') {
     const password = form.querySelector<HTMLInputElement>('#password')!.value;
     state.busy = true;
@@ -637,13 +744,24 @@ app.addEventListener('submit', async (event) => {
 async function start(): Promise<void> {
   shell('<p class="empty" role="status">Preparando a agenda…</p>');
   try {
-    const catalog = await api<{ shop: Shop; services: Service[] }>('/api/services');
+    const catalog = await api<{
+      shop: Shop;
+      services: Service[];
+      features?: { phoneVerification: boolean };
+    }>('/api/services');
     state.shop = catalog.shop;
+    state.phoneVerification = Boolean(catalog.features?.phoneVerification);
     state.services = catalog.services;
     timezone = catalog.shop.timezone;
     state.date = localDate();
     state.serviceId = catalog.services[0]?.id || '';
-    document.title = `${shopName()} · Seu próximo horário`;
+    document.title = `${shopName()} · ${isHub ? 'Hub' : 'Seu próximo horário'}`;
+    if (isPrivate) {
+      document.title = `${shopName()} · Sua reserva`;
+      await reservationAccess.start();
+      return;
+    }
+    if (isHub) void hubTools.start();
     if (isCustomer) {
       document.title = `${shopName()} · Meus horários`;
       await myBookings.start();

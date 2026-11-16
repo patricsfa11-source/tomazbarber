@@ -2,6 +2,8 @@
 
 A primeira reserva continua no navegador, com somente nome completo e celular com DDD. Não há senha, e-mail ou instalação de aplicativo. A TOMAZ BARBER mantém o catálogo escuro, a logo e o agendamento atual.
 
+A etapa [Cliente e hub instalável](cliente-hub.md) acrescenta um link privado por reserva, independente desta verificação. A sessão de 24 horas de Meus horários permanece. Sem remetente configurado, a interface orienta a usar o link salvo na confirmação, sem solicitar um código que não poderia ser entregue. Os totais atuais da suíte e as novas telas estão naquela documentação.
+
 ## Fluxo proposto para avaliação
 
 1. O cliente abre **Meus horários** pelo catálogo ou pela confirmação da reserva.

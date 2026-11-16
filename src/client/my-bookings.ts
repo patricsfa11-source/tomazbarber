@@ -12,6 +12,7 @@ interface Options {
   escape: (value: unknown) => string;
   shop: () => Shop;
   publicPath: string;
+  verificationAvailable: () => boolean;
 }
 export function createMyBookings(o: Options) {
   const e = o.escape;
@@ -83,7 +84,9 @@ export function createMyBookings(o: Options) {
     `<div class="my-booking-summary"><span class="eyebrow">${a.status === 'cancelled' ? 'CANCELADO' : 'SEU HORÁRIO'}</span><h2>${e(a.service)}</h2><p class="my-when">${e(when(a))}</p><p>${e(a.price)}<br><span class="muted">${a.duration} minutos · Pagamento no atendimento</span></p></div>`;
   function render() {
     let content = '';
-    if (view === 'phone')
+    if (view === 'phone' && !o.verificationAvailable())
+      content = `<section class="customer-card"><h2>Use o link da sua reserva.</h2><p class="muted">Na confirmação do agendamento, você recebe um link privado para consultar, remarcar ou cancelar aquele atendimento pelo navegador.</p><p class="note">Nome e telefone não liberam a consulta das reservas.</p><a class="primary" href="${o.publicPath}">Escolher um serviço</a></section>`;
+    if (view === 'phone' && o.verificationAvailable())
       content = `<section class="customer-card verify-card"><span class="eyebrow">ACESSO PELO WHATSAPP</span><h2>Seus horários,<br>com você.</h2><p class="muted">Informe o celular usado na reserva. Vamos enviar um código para confirmar que o número é seu.</p><form id="customer-phone"><label for="customer-phone-input">Celular com DDD<input id="customer-phone-input" type="tel" autocomplete="tel" inputmode="tel" placeholder="(75) 99999-9999" value="${e(phone)}" maxlength="20" required></label><button class="primary" ${busy ? 'disabled' : ''}>${busy ? 'Enviando…' : 'Receber código pelo WhatsApp'} <span aria-hidden="true">→</span></button></form><p class="note">Sem senha ou cadastro adicional. O código vale por 5 minutos e dá acesso apenas aos seus horários neste estabelecimento.</p></section>`;
     if (view === 'code')
       content = `<section class="customer-card verify-card"><span class="eyebrow">CONFIRME SEU CELULAR</span><h2>Confira seu WhatsApp.</h2><p class="muted">Enviamos um código para <strong>${e(maskedPhone)}</strong>.</p><form id="customer-code"><label for="customer-code-input">Código de verificação<input id="customer-code-input" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" value="${e(code)}" placeholder="000000" required aria-describedby="code-help"></label><p id="code-help" class="note">Digite os seis dígitos. O código vale por 5 minutos. Não compartilhe com ninguém.</p><button class="primary" ${busy ? 'disabled' : ''}>${busy ? 'Verificando…' : 'Ver meus horários'} <span aria-hidden="true">→</span></button></form><div class="verification-actions"><button class="text-button" data-customer-action="resend" ${busy || Date.now() < resendAt ? 'disabled' : ''}>Reenviar código</button><button class="text-button" data-customer-action="change-phone" ${busy ? 'disabled' : ''}>Corrigir número</button></div><p class="note" data-resend-count>${Date.now() < resendAt ? `Você pode reenviar em ${Math.ceil((resendAt - Date.now()) / 1000)}s.` : Date.now() >= expiresAt ? 'Código expirado. Solicite um novo.' : 'Não recebeu? Confira o número ou solicite outro código.'}</p></section>`;
@@ -251,7 +254,8 @@ export function createMyBookings(o: Options) {
         maskedPhone = (await api<{ maskedPhone: string }>('/session')).maskedPhone;
         await list();
       } catch (cause) {
-        if ((cause as { status?: number })?.status !== 401) failure(cause);
+        if ((cause as { status?: number })?.status !== 401 && o.verificationAvailable())
+          failure(cause);
         render();
       }
     },

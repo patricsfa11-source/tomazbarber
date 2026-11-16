@@ -1,0 +1,53 @@
+:root {
+  color-scheme: dark;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #eeeee8;
+  background: #121412;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+main {
+  max-width: 460px;
+  margin: 12vh auto;
+  padding: 28px 24px;
+}
+.eyebrow {
+  font-size: 0.7rem;
+  color: #d5b36b;
+  letter-spacing: 0.18em;
+}
+.symbol {
+  display: block;
+  font-size: 3.5rem;
+  color: #d5b36b;
+  margin: 40px 0 20px;
+}
+h1 {
+  font-size: 2.6rem;
+  line-height: 1.1;
+  letter-spacing: -0.05em;
+}
+p {
+  color: #a5a89e;
+  line-height: 1.7;
+  font-size: 1rem;
+}
+a {
+  display: block;
+  background: #d5b36b;
+  color: #121412;
+  text-decoration: none;
+  font-weight: bold;
+  text-align: center;
+  padding: 18px;
+  margin-top: 32px;
+  border-radius: 4px;
+}
+a:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 4px;
+}
