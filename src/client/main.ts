@@ -1,3 +1,4 @@
+import '@fontsource-variable/geist/wght.css';
 import './style.css';
 import { createAgendaManagement } from './agenda-management';
 import { createMyBookings } from './my-bookings';
