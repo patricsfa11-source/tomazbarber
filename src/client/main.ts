@@ -3,6 +3,7 @@ import './style.css';
 import { createAgendaManagement } from './agenda-management';
 import { createMyBookings } from './my-bookings';
 import { createReservationAccess } from './reservation-access';
+import { reservationSummary } from './reservation-summary';
 import { createServiceManagement } from './service-management';
 import { createHubTools } from './hub-tools';
 import { copyText } from './clipboard';
@@ -47,6 +48,8 @@ const state = {
   agendaStatus: 'confirmed' as 'confirmed' | 'all',
   notice: '',
   phoneVerification: false,
+  verificationMode: 'disabled' as 'disabled' | 'sms' | 'simulated',
+  simulatedPhones: [] as string[],
   customerForm: false,
   newCustomerName: '',
   newCustomerPhone: '',
@@ -239,7 +242,7 @@ function detailsView(): string {
 }
 function confirmation(): string {
   const r = state.receipt!;
-  return `<section class="confirmation"><span class="success-mark" aria-hidden="true">✓</span><span class="eyebrow">HORÁRIO GARANTIDO</span><h1>${isHub ? 'Encaixe confirmado.' : 'Nos vemos em breve.'}</h1><p>Seu horário está reservado em ${escape(shopName())}.</p><div class="confirmed-details"><span>${escape(dateLabel(localDate(new Date(r.startsAt * 1000))))}</span><strong>${timeLabel(r.startsAt)}</strong><h2>${escape(r.service)}</h2><p>${escape(r.price)} · ${r.duration} minutos</p><small>Reserva ${escape(r.id.slice(0, 8).toUpperCase())}</small></div><p class="muted">Chegue 10 minutos antes do horário. Sua confirmação está aqui na tela.</p>${r.manageUrl ? `<a class="primary my-receipt-link" href="${escape(r.manageUrl || customerPath)}" data-private-receipt-link>Consultar ou alterar esta reserva <span aria-hidden="true">→</span></a><button class="text-button" data-action="copy-private-link">Copiar link privado</button><p class="note private-link-note">Guarde este link. Quem tiver acesso a ele poderá consultar e alterar somente esta reserva.</p>` : ''}<p class="success-note" role="status" data-copy-status hidden></p><button class="${isHub ? 'primary' : 'text-button'}" data-action="restart">${isHub ? 'Voltar à agenda' : 'Fazer outra reserva'} <span aria-hidden="true">→</span></button></section>`;
+  return `<section class="confirmation"><span class="success-mark" aria-hidden="true">✓</span><span class="eyebrow">HORÁRIO GARANTIDO</span><h1>${isHub ? 'Encaixe confirmado.' : 'Nos vemos em breve.'}</h1><p>Seu horário está reservado em ${escape(shopName())}.</p>${reservationSummary({ ...r, status: 'confirmed' }, state.shop!, escape, 'confirmed-details')}<p class="muted">Chegue 10 minutos antes do horário. Sua confirmação está aqui na tela.</p>${!isHub ? `<a class="primary account-receipt-link" href="${customerPath}">Ver meus horários</a>` : ''}${r.manageUrl ? `<a class="text-button my-receipt-link" href="${escape(r.manageUrl || customerPath)}" data-private-receipt-link>Consultar ou alterar esta reserva <span aria-hidden="true">→</span></a><button class="text-button" data-action="copy-private-link">Copiar link privado</button><p class="note private-link-note">Guarde este link. Quem tiver acesso a ele poderá consultar e alterar somente esta reserva.</p>` : ''}<p class="success-note" role="status" data-copy-status hidden></p><button class="${isHub ? 'primary' : 'text-button'}" data-action="restart">${isHub ? 'Voltar à agenda' : 'Fazer outra reserva'} <span aria-hidden="true">→</span></button></section>`;
 }
 function renderBooking(): void {
   if (isHub && state.services.length === 0 && !state.receipt) {
@@ -464,6 +467,8 @@ const myBookings = createMyBookings({
   shop: () => state.shop!,
   publicPath,
   verificationAvailable: () => state.phoneVerification,
+  verificationMode: () => state.verificationMode,
+  simulatedPhones: () => state.simulatedPhones,
 });
 const hubTools = createHubTools({
   shop: () => state.shop,
@@ -826,10 +831,16 @@ async function start(): Promise<void> {
     const catalog = await api<{
       shop: Shop;
       services: Service[];
-      features?: { phoneVerification: boolean };
+      features?: {
+        phoneVerification: boolean;
+        verificationMode?: 'disabled' | 'sms' | 'simulated';
+        simulatedPhones?: string[];
+      };
     }>('/api/services');
     state.shop = catalog.shop;
     state.phoneVerification = Boolean(catalog.features?.phoneVerification);
+    state.verificationMode = catalog.features?.verificationMode || 'disabled';
+    state.simulatedPhones = catalog.features?.simulatedPhones || [];
     state.services = catalog.services;
     timezone = catalog.shop.timezone;
     state.date = localDate();

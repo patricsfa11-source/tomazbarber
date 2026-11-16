@@ -2,16 +2,16 @@
 
 A primeira reserva continua no navegador, com somente nome completo e celular com DDD. Não há senha, e-mail ou instalação de aplicativo. A TOMAZ BARBER mantém o catálogo escuro, a logo e o agendamento atual.
 
-A etapa [Cliente e hub instalável](cliente-hub.md) acrescenta um link privado por reserva, independente desta verificação. A sessão de 24 horas de Meus horários permanece. Sem remetente configurado, a interface orienta a usar o link salvo na confirmação, sem solicitar um código que não poderia ser entregue. Os totais atuais da suíte e as novas telas estão naquela documentação.
+A etapa [Cliente e hub instalável](cliente-hub.md) acrescenta um link privado por reserva, independente desta verificação. A [conta do cliente](conta-cliente.md) mantém a sessão por 30 dias após o código. Sem remetente configurado, a interface orienta a usar o link salvo na confirmação, sem solicitar um código que não poderia ser entregue. Os totais atuais da suíte e as novas telas estão naquela documentação.
 
 ## Fluxo proposto para avaliação
 
 1. O cliente abre **Meus horários** pelo catálogo ou pela confirmação da reserva.
-2. Informa o celular utilizado na reserva. O remetente recebe uma solicitação de código de seis dígitos pelo WhatsApp, identificando o estabelecimento.
+2. Informa nome completo e o número do WhatsApp utilizado na reserva. O código de seis dígitos será enviado por SMS para esse mesmo número; WhatsApp fica reservado a confirmações e lembretes.
 3. O cliente digita o código no navegador. O código vale por cinco minutos, pode ser usado uma única vez e permite até cinco tentativas.
-4. Depois da verificação, vê **Próximos** e **Histórico** apenas daquele número e estabelecimento. A sessão dura 24 horas, com opção **Sair**. Em outro navegador ou estabelecimento, precisa verificar novamente.
+4. Depois da verificação, vê **Próximos horários** e **Histórico** apenas daquele número e estabelecimento. A sessão dura 30 dias, com opção **Sair**. Em outro navegador ou estabelecimento, precisa verificar novamente.
 
-O remetente real ainda precisa ser escolhido. Nesta entrega, os testes usam um Worker simulado: nenhuma mensagem real é enviada. Não há código de teste fixo nem forma de obter o código pela API pública da aplicação. Sem remetente e segredo configurados, o agendamento continua funcionando e a verificação informa que está indisponível.
+O remetente real ainda precisa ser escolhido. Nesta entrega, os testes usam um Worker simulado: nenhuma mensagem real é enviada. Não há código de teste fixo. O modo SMS nunca expõe o código pela API pública; no piloto, a simulação identificada permite obter somente o código de números fictícios explicitamente autorizados. Consulte a configuração atual em [Conta do cliente](conta-cliente.md). Sem remetente e segredo configurados, o agendamento continua funcionando e a verificação informa que está indisponível.
 
 Uma proposta de texto para o futuro remetente:
 

@@ -40,9 +40,10 @@ async function message(request: APIRequestContext, challengeId: string) {
 }
 async function verify(page: Page, shop: string, phone: string) {
   await page.goto(`/s/${shop}/meus-horarios`);
-  await page.getByLabel('Celular com DDD').fill(phone);
+  await page.getByLabel('Nome completo', { exact: true }).fill('Cliente Fictício');
+  await page.getByLabel('Número do WhatsApp com DDD').fill(phone);
   const responsePromise = page.waitForResponse((r) => r.url().endsWith('/customer/verification'));
-  await page.getByRole('button', { name: 'Receber código pelo WhatsApp' }).click();
+  await page.getByRole('button', { name: 'Receber código por SMS' }).click();
   const response = await responsePromise;
   expect(response.status()).toBe(201);
   const sent = await message(page.request, (await response.json()).challengeId);
@@ -55,7 +56,7 @@ async function fits(page: Page) {
     true,
   );
 }
-test('cliente verifica WhatsApp, remarca com conflito preservado e cancela pelo celular', async ({
+test('cliente verifica SMS, remarca com conflito preservado e cancela pelo celular', async ({
   page,
   request,
 }, info) => {
@@ -70,13 +71,14 @@ test('cliente verifica WhatsApp, remarca com conflito preservado e cancela pelo 
   await page.getByRole('link', { name: 'Meus horários', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Meus horários', exact: true })).toBeVisible();
   await page.screenshot({ path: info.outputPath('acesso-mobile.png'), fullPage: true });
-  await page.getByLabel('Celular com DDD').fill(phone);
+  await page.getByLabel('Nome completo', { exact: true }).fill('Cliente Fictício');
+  await page.getByLabel('Número do WhatsApp com DDD').fill(phone);
   const start = page.waitForResponse((r) => r.url().endsWith('/customer/verification'));
-  await page.getByRole('button', { name: 'Receber código pelo WhatsApp' }).click();
+  await page.getByRole('button', { name: 'Receber código por SMS' }).click();
   const response = await start;
   expect(response.status()).toBe(201);
   const sent = await message(request, (await response.json()).challengeId);
-  await expect(page.getByRole('heading', { name: 'Confira seu WhatsApp.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Confira seu SMS.' })).toBeVisible();
   await fits(page);
   await page.screenshot({ path: info.outputPath('codigo-mobile.png'), fullPage: true });
   await page.getByLabel('Código de verificação').fill(sent.code === '000000' ? '111111' : '000000');
@@ -116,17 +118,17 @@ test('cliente verifica WhatsApp, remarca com conflito preservado e cancela pelo 
   await page.screenshot({ path: info.outputPath('cancelamento-mobile.png'), fullPage: true });
   await page.getByRole('button', { name: 'Confirmar cancelamento', exact: true }).click();
   await expect(page.locator('.success-note')).toContainText('Reserva cancelada sem custo');
-  await expect(page.locator('.my-bookings')).toContainText('Reserva cancelada');
+  await expect(page.locator('.my-bookings')).toContainText('Cancelada');
   await page.screenshot({ path: info.outputPath('historico-mobile.png'), fullPage: true });
   await page.setViewportSize({ width: 320, height: 740 });
   await fits(page);
-  await page.getByRole('button', { name: 'Próximos', exact: true }).click();
+  await page.getByRole('button', { name: 'Próximos horários', exact: true }).click();
   await expect(
     page.getByRole('heading', { name: 'Seu próximo cuidado começa aqui.' }),
   ).toBeVisible();
   await fits(page);
   await page.getByRole('button', { name: 'Sair', exact: true }).click();
-  await expect(page.getByLabel('Celular com DDD')).toBeVisible();
+  await expect(page.getByLabel('Número do WhatsApp com DDD')).toBeVisible();
   await fits(page);
   expect(errors).toEqual([]);
 });

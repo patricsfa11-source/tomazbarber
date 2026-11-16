@@ -1,3 +1,4 @@
+import { reservationSummary } from './reservation-summary';
 import { addDays, localDate, dateLabel, timeLabel, type Shop } from '../shared';
 import {
   cancellationNotice,
@@ -13,11 +14,15 @@ interface Options {
   shop: () => Shop;
   publicPath: string;
   verificationAvailable: () => boolean;
+  verificationMode: () => 'disabled' | 'sms' | 'simulated';
+  simulatedPhones: () => string[];
 }
 export function createMyBookings(o: Options) {
   const e = o.escape;
   let view: 'phone' | 'code' | 'list' | 'reschedule' | 'cancel' = 'phone';
-  let phone = '',
+  let name = '',
+    simulatedCode = '',
+    phone = '',
     code = '',
     maskedPhone = '',
     challengeId = '',
@@ -80,18 +85,17 @@ export function createMyBookings(o: Options) {
       maskedPhone = '';
     }
   }
-  const bookingInfo = (a: CustomerBooking) =>
-    `<div class="my-booking-summary"><span class="eyebrow">${a.status === 'cancelled' ? 'CANCELADO' : 'SEU HORÁRIO'}</span><h2>${e(a.service)}</h2><p class="my-when">${e(when(a))}</p><p>${e(a.price)}<br><span class="muted">${a.duration} minutos · Pagamento no atendimento</span></p></div>`;
+  const bookingInfo = (a: CustomerBooking) => reservationSummary(a, o.shop(), e);
   function render() {
     let content = '';
     if (view === 'phone' && !o.verificationAvailable())
       content = `<section class="customer-card"><h2>Use o link da sua reserva.</h2><p class="muted">Na confirmação do agendamento, você recebe um link privado para consultar, remarcar ou cancelar aquele atendimento pelo navegador.</p><p class="note">Nome e telefone não liberam a consulta das reservas.</p><a class="primary" href="${o.publicPath}">Escolher um serviço</a></section>`;
     if (view === 'phone' && o.verificationAvailable())
-      content = `<section class="customer-card verify-card"><span class="eyebrow">ACESSO PELO WHATSAPP</span><h2>Seus horários,<br>com você.</h2><p class="muted">Informe o celular usado na reserva. Vamos enviar um código para confirmar que o número é seu.</p><form id="customer-phone"><label for="customer-phone-input">Celular com DDD<input id="customer-phone-input" type="tel" autocomplete="tel" inputmode="tel" placeholder="(75) 99999-9999" value="${e(phone)}" maxlength="20" required></label><button class="primary" ${busy ? 'disabled' : ''}>${busy ? 'Enviando…' : 'Receber código pelo WhatsApp'} <span aria-hidden="true">→</span></button></form><p class="note">Sem senha ou cadastro adicional. O código vale por 5 minutos e dá acesso apenas aos seus horários neste estabelecimento.</p></section>`;
+      content = `<section class="customer-card verify-card"><span class="eyebrow">SUA CONTA</span><h2>Seus horários,<br>com você.</h2><p class="muted">Use seu nome e o número do WhatsApp informado nas reservas. Confirme a posse do número com um código para consultar apenas seus horários.</p>${o.verificationMode() === 'simulated' ? `<p class="preserve-note" data-simulation-note>Simulação do piloto: nenhum SMS ou WhatsApp será enviado. Use apenas os números fictícios ${o.simulatedPhones().map(e).join(' ou ')}.</p>` : ''}<form id="customer-phone"><label for="customer-name-input">Nome completo<input id="customer-name-input" autocomplete="name" required minlength="5" maxlength="100" value="${e(name)}"></label><label for="customer-phone-input">Número do WhatsApp com DDD<input id="customer-phone-input" type="tel" autocomplete="tel" inputmode="tel" placeholder="(75) 99999-9999" value="${e(phone)}" maxlength="20" required></label><button class="primary" ${busy ? 'disabled' : ''}>${busy ? 'Enviando…' : o.verificationMode() === 'simulated' ? 'Gerar código de teste' : 'Receber código por SMS'} <span aria-hidden="true">→</span></button></form><p class="note">O código vale por 5 minutos. Após confirmar, sua conta fica conectada neste aparelho por 30 dias. Você também pode agendar como convidado.</p></section>`;
     if (view === 'code')
-      content = `<section class="customer-card verify-card"><span class="eyebrow">CONFIRME SEU CELULAR</span><h2>Confira seu WhatsApp.</h2><p class="muted">Enviamos um código para <strong>${e(maskedPhone)}</strong>.</p><form id="customer-code"><label for="customer-code-input">Código de verificação<input id="customer-code-input" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" value="${e(code)}" placeholder="000000" required aria-describedby="code-help"></label><p id="code-help" class="note">Digite os seis dígitos. O código vale por 5 minutos. Não compartilhe com ninguém.</p><button class="primary" ${busy ? 'disabled' : ''}>${busy ? 'Verificando…' : 'Ver meus horários'} <span aria-hidden="true">→</span></button></form><div class="verification-actions"><button class="text-button" data-customer-action="resend" ${busy || Date.now() < resendAt ? 'disabled' : ''}>Reenviar código</button><button class="text-button" data-customer-action="change-phone" ${busy ? 'disabled' : ''}>Corrigir número</button></div><p class="note" data-resend-count>${Date.now() < resendAt ? `Você pode reenviar em ${Math.ceil((resendAt - Date.now()) / 1000)}s.` : Date.now() >= expiresAt ? 'Código expirado. Solicite um novo.' : 'Não recebeu? Confira o número ou solicite outro código.'}</p></section>`;
+      content = `<section class="customer-card verify-card"><span class="eyebrow">CONFIRME SEU CELULAR</span><h2>${o.verificationMode() === 'simulated' ? 'Seu código de teste.' : 'Confira seu SMS.'}</h2><p class="muted">${o.verificationMode() === 'simulated' ? 'Código fictício para' : 'Enviamos um SMS para'} <strong>${e(maskedPhone)}</strong>.</p>${simulatedCode ? `<p class="simulation-code" data-simulated-code>Código de teste: <strong>${e(simulatedCode)}</strong></p>` : ''}<form id="customer-code"><label for="customer-code-input">Código de verificação<input id="customer-code-input" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" value="${e(code)}" placeholder="000000" required aria-describedby="code-help"></label><p id="code-help" class="note">Digite os seis dígitos. O código vale por 5 minutos. Não compartilhe com ninguém.</p><button class="primary" ${busy ? 'disabled' : ''}>${busy ? 'Verificando…' : 'Ver meus horários'} <span aria-hidden="true">→</span></button></form><div class="verification-actions"><button class="text-button" data-customer-action="resend" ${busy || Date.now() < resendAt ? 'disabled' : ''}>Reenviar código</button><button class="text-button" data-customer-action="change-phone" ${busy ? 'disabled' : ''}>Corrigir número</button></div><p class="note" data-resend-count>${Date.now() < resendAt ? `Você pode reenviar em ${Math.ceil((resendAt - Date.now()) / 1000)}s.` : Date.now() >= expiresAt ? 'Código expirado. Solicite um novo.' : 'Não recebeu? Confira o número ou solicite outro código.'}</p></section>`;
     if (view === 'list')
-      content = `<div class="my-session"><span>Celular verificado<br><strong>${e(maskedPhone)}</strong></span><button class="text-button" data-customer-action="logout" ${busy ? 'disabled' : ''}>Sair</button></div><nav class="my-tabs" aria-label="Seus atendimentos"><button data-customer-action="upcoming" aria-pressed="${!history}">Próximos</button><button data-customer-action="history" aria-pressed="${history}">Histórico</button></nav>${loading ? '<p class="empty" role="status">Buscando seus horários…</p>' : appointments.length ? `<ul class="my-bookings">${appointments.map((a) => `<li class="customer-card">${bookingInfo(a)}${a.status === 'confirmed' && a.startsAt * 1000 > Date.now() ? `<div class="my-booking-actions"><button class="text-button" data-customer-reschedule="${e(a.id)}">Remarcar</button><button class="text-button danger-text" data-customer-cancel="${e(a.id)}">${a.canCancel ? 'Cancelar' : 'Sobre cancelamento'}</button></div>` : `<p class="status ${a.status === 'cancelled' ? 'cancelled' : ''}">${a.status === 'cancelled' ? 'Reserva cancelada' : a.status === 'completed' ? 'Atendimento concluído' : 'Atendimento passado'}</p>`}</li>`).join('')}</ul>` : `<section class="customer-card my-empty"><span aria-hidden="true">◷</span><h2>${history ? 'Nenhum horário no histórico.' : 'Seu próximo cuidado começa aqui.'}</h2><p class="muted">${history ? 'Atendimentos passados e cancelados aparecem aqui.' : 'Não há reservas futuras para este celular em ' + e(o.shop().name) + '.'}</p><a class="primary" href="${o.publicPath}">Escolher um serviço <span aria-hidden="true">→</span></a></section>`}${cursor && !loading ? `<button class="text-button" data-customer-action="more" ${busy ? 'disabled' : ''}>Ver mais horários</button>` : ''}<div class="customer-policy"><h3>Se precisar mudar os planos</h3><p>${cancellationNotice}</p><p class="muted">Com menos de 2 horas, combine alterações diretamente com o salão. Taxa de falta de R$ 15,00 tratada presencialmente.</p></div>`;
+      content = `<div class="my-session"><span><strong>${e(name)}</strong><br>Celular verificado · ${e(maskedPhone)}</span><button class="text-button" data-customer-action="logout" ${busy ? 'disabled' : ''}>Sair</button></div><nav class="my-tabs" aria-label="Seus atendimentos"><button data-customer-action="upcoming" aria-pressed="${!history}">Próximos horários</button><button data-customer-action="history" aria-pressed="${history}">Histórico</button></nav>${loading ? '<p class="empty" role="status">Buscando seus horários…</p>' : appointments.length ? `<ul class="my-bookings">${appointments.map((a) => `<li class="customer-card">${bookingInfo(a)}${a.status === 'confirmed' && a.startsAt * 1000 > Date.now() ? `<div class="my-booking-actions"><button class="text-button" data-customer-reschedule="${e(a.id)}">Remarcar</button><button class="text-button danger-text" data-customer-cancel="${e(a.id)}">${a.canCancel ? 'Cancelar' : 'Sobre cancelamento'}</button></div>` : ''}</li>`).join('')}</ul>` : `<section class="customer-card my-empty"><span aria-hidden="true">◷</span><h2>${history ? 'Nenhum horário no histórico.' : 'Seu próximo cuidado começa aqui.'}</h2><p class="muted">${history ? 'Atendimentos passados e cancelados aparecem aqui.' : 'Não há reservas futuras para este celular em ' + e(o.shop().name) + '.'}</p><a class="primary" href="${o.publicPath}">Escolher um serviço <span aria-hidden="true">→</span></a></section>`}${cursor && !loading ? `<button class="text-button" data-customer-action="more" ${busy ? 'disabled' : ''}>Ver mais horários</button>` : ''}<div class="customer-policy"><h3>Se precisar mudar os planos</h3><p>${cancellationNotice}</p><p class="muted">Com menos de 2 horas, combine alterações diretamente com o salão. Taxa de falta de R$ 15,00 tratada presencialmente.</p></div>`;
     if (view === 'reschedule' && current)
       content = `<section class="customer-card">${bookingInfo(current)}<div class="current-slot"><strong>Seu horário atual está reservado.</strong><p>Ele só será liberado depois da confirmação do novo horário.</p></div><h3>Escolha o novo horário</h3><label for="customer-date">Nova data<input id="customer-date" type="date" value="${date}" min="${today()}" max="${addDays(today(), 90)}" ${busy || loading ? 'disabled' : ''} required></label>${
         loading
@@ -167,6 +171,7 @@ export function createMyBookings(o: Options) {
   async function send() {
     busy = true;
     code = '';
+    simulatedCode = '';
     render();
     try {
       const result = await api<{
@@ -174,7 +179,9 @@ export function createMyBookings(o: Options) {
         maskedPhone: string;
         expiresAt: number;
         resendAfter: number;
-      }>('/verification', { phone });
+        simulatedCode?: string;
+      }>('/verification', { name, phone });
+      simulatedCode = result.simulatedCode || '';
       challengeId = result.challengeId;
       maskedPhone = result.maskedPhone;
       expiresAt = result.expiresAt * 1000;
@@ -251,7 +258,9 @@ export function createMyBookings(o: Options) {
     async start() {
       render();
       try {
-        maskedPhone = (await api<{ maskedPhone: string }>('/session')).maskedPhone;
+        const session = await api<{ maskedPhone: string; name: string }>('/session');
+        maskedPhone = session.maskedPhone;
+        name = session.name;
         await list();
       } catch (cause) {
         if ((cause as { status?: number })?.status !== 401 && o.verificationAvailable())
@@ -261,6 +270,7 @@ export function createMyBookings(o: Options) {
     },
     render,
     input(input: HTMLInputElement) {
+      if (input.id === 'customer-name-input') name = input.value;
       if (input.id === 'customer-phone-input') phone = input.value;
       if (input.id === 'customer-code-input') code = input.value;
     },
@@ -280,9 +290,11 @@ export function createMyBookings(o: Options) {
         busy = true;
         render();
         try {
-          maskedPhone = (await api<{ maskedPhone: string }>('/verify', { challengeId, code }))
-            .maskedPhone;
+          maskedPhone = (
+            await api<{ maskedPhone: string; name: string }>('/verify', { challengeId, code })
+          ).maskedPhone;
           code = '';
+          simulatedCode = '';
           challengeId = '';
           await list();
           focus();
@@ -351,6 +363,8 @@ export function createMyBookings(o: Options) {
             await api('/logout', {});
             clear();
             view = 'phone';
+            name = '';
+            simulatedCode = '';
             phone = '';
             maskedPhone = '';
           } catch (cause) {

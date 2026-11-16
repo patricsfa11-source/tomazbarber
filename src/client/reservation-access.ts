@@ -1,5 +1,6 @@
 import { addDays, localDate, dateLabel, timeLabel, type Shop } from '../shared';
 import { cancellationNotice, lateChangeNotice, type CustomerBooking } from '../customer';
+import { reservationSummary } from './reservation-summary';
 import { copyText } from './clipboard';
 interface Options {
   id: string;
@@ -38,8 +39,7 @@ export function createReservationAccess(o: Options) {
     const h = Number(time(s).slice(0, 2));
     return h >= t.from && h < t.to;
   };
-  const info = (a: CustomerBooking) =>
-    `<div class="my-booking-summary"><span class="eyebrow">${a.status === 'cancelled' ? 'RESERVA CANCELADA' : 'SEU ATENDIMENTO'}</span><h2>${e(a.service)}</h2><p class="my-when">${e(dateLabel(localDate(new Date(a.startsAt * 1000), o.shop().timezone), o.shop().timezone))}<br>${time(a.startsAt)}–${time(a.endsAt)}</p><p>${e(a.price)}<br><span class="muted">${a.duration} minutos · Pagamento no atendimento</span></p><small>Reserva ${e(a.id.slice(0, 8).toUpperCase())}</small></div>`;
+  const info = (a: CustomerBooking) => reservationSummary(a, o.shop(), e);
   function render() {
     let content = '';
     if (loading && !appointment)
@@ -47,9 +47,9 @@ export function createReservationAccess(o: Options) {
     else if (!appointment)
       content = `<section class="customer-card"><h2>Abra seu link privado.</h2><p class="muted">Use o link completo salvo na confirmação. Informar nome ou telefone não libera a consulta.</p><a class="primary" href="${o.publicPath}">Voltar ao agendamento</a></section>`;
     else if (view === 'summary')
-      content = `<section class="customer-card">${info(appointment)}<p class="status ${appointment.status === 'cancelled' ? 'cancelled' : ''}">${appointment.status === 'cancelled' ? 'Cancelada · Registro preservado' : appointment.status === 'completed' ? 'Atendimento concluído' : 'Confirmada'}</p>${appointment.status === 'confirmed' && appointment.startsAt * 1000 > Date.now() ? `<div class="my-booking-actions"><button class="text-button" data-private="reschedule">Remarcar</button><button class="text-button danger-text" data-private="cancel">${appointment.canCancel ? 'Cancelar' : 'Sobre cancelamento'}</button></div>` : ''}</section><section class="customer-policy"><h3>Se precisar mudar os planos</h3><p>${cancellationNotice}</p><p class="muted">Com menos de 2 horas, combine alterações diretamente com o salão. A taxa de falta de R$ 15,00 é tratada presencialmente.</p></section>${privateUrl ? '<button class="primary private-copy" data-private="copy">Copiar link privado desta reserva</button>' : ''}<p class="note">Guarde o link para voltar a este atendimento. Quem tiver o link poderá consultar e alterar somente esta reserva.</p><div class="private-bottom"><a class="text-button" href="${o.publicPath}">Fazer outra reserva</a><button class="text-button" data-private="logout">Fechar acesso</button></div>`;
+      content = `<section class="customer-card reservation-card">${info(appointment)}${appointment.status === 'confirmed' && appointment.startsAt * 1000 > Date.now() ? `<div class="my-booking-actions"><button class="text-button" data-private="reschedule">Remarcar</button><button class="text-button danger-text" data-private="cancel">${appointment.canCancel ? 'Cancelar' : 'Sobre cancelamento'}</button></div>` : ''}</section><section class="customer-policy"><h3>Se precisar mudar os planos</h3><p>${cancellationNotice}</p><p class="muted">Com menos de 2 horas, combine alterações diretamente com o salão. A taxa de falta de R$ 15,00 é tratada presencialmente.</p></section>${privateUrl ? '<button class="primary private-copy" data-private="copy">Copiar link privado desta reserva</button>' : ''}<p class="note">Guarde o link para voltar a este atendimento. Quem tiver o link poderá consultar e alterar somente esta reserva.</p><div class="private-bottom"><a class="text-button" href="${o.publicPath}">Fazer outra reserva</a><button class="text-button" data-private="logout">Fechar acesso</button></div>`;
     else if (view === 'reschedule')
-      content = `<section class="customer-card">${info(appointment)}<div class="current-slot"><strong>Seu horário atual continua reservado.</strong><p>Ele só será liberado depois da confirmação do novo.</p></div><h3>Escolha o novo horário</h3><label for="private-date">Nova data<input id="private-date" type="date" value="${date}" min="${today()}" max="${addDays(today(), 90)}" ${loading || busy ? 'disabled' : ''}></label>${
+      content = `<section class="customer-card reservation-card">${info(appointment)}<div class="current-slot"><strong>Seu horário atual continua reservado.</strong><p>Ele só será liberado depois da confirmação do novo.</p></div><h3>Escolha o novo horário</h3><label for="private-date">Nova data<input id="private-date" type="date" value="${date}" min="${today()}" max="${addDays(today(), 90)}" ${loading || busy ? 'disabled' : ''}></label>${
         loading
           ? '<p class="empty" role="status">Consultando horários…</p>'
           : slots.length
@@ -63,7 +63,7 @@ export function createReservationAccess(o: Options) {
             : '<p class="empty">Nenhum horário livre nesta data. Escolha outra data.</p>'
       }${target ? `<div class="review my-new-slot"><h3>Confirme o novo horário</h3><p>${e(dateLabel(date, o.shop().timezone))}<strong>${time(target)}–${time(target + appointment.duration * 60)}</strong></p><p>Serviço, preço e duração continuam os mesmos.</p></div>` : ''}<div class="actions"><button class="text-button" data-private="back" ${busy ? 'disabled' : ''}>← Voltar</button><button class="primary" data-private="confirm-reschedule" ${busy || !target || loading ? 'disabled' : ''}>${busy ? 'Confirmando…' : 'Confirmar remarcação'}</button></div></section>`;
     else
-      content = `<section class="customer-card">${info(appointment)}<h3>${appointment.canCancel ? 'Cancelar este horário?' : 'Combine com o salão'}</h3><p>${cancellationNotice}</p>${appointment.canCancel ? '<p class="muted">Ao confirmar, seu horário será liberado. O registro da reserva será mantido.</p>' : `<p class="preserve-note">${lateChangeNotice}</p>`}<div class="actions"><button class="text-button" data-private="back" ${busy ? 'disabled' : ''}>Manter minha reserva</button>${appointment.canCancel ? `<button class="primary danger-button" data-private="confirm-cancel" ${busy ? 'disabled' : ''}>${busy ? 'Cancelando…' : 'Confirmar cancelamento'}</button>` : ''}</div></section>`;
+      content = `<section class="customer-card reservation-card">${info(appointment)}<h3>${appointment.canCancel ? 'Cancelar este horário?' : 'Combine com o salão'}</h3><p>${cancellationNotice}</p>${appointment.canCancel ? '<p class="muted">Ao confirmar, seu horário será liberado. O registro da reserva será mantido.</p>' : `<p class="preserve-note">${lateChangeNotice}</p>`}<div class="actions"><button class="text-button" data-private="back" ${busy ? 'disabled' : ''}>Manter minha reserva</button>${appointment.canCancel ? `<button class="primary danger-button" data-private="confirm-cancel" ${busy ? 'disabled' : ''}>${busy ? 'Cancelando…' : 'Confirmar cancelamento'}</button>` : ''}</div></section>`;
     o.shell(
       `<div class="my-layout"><section class="my-heading"><span class="eyebrow">${e(o.shop().name)} / ACESSO PRIVADO</span><h1>Sua reserva</h1><p class="muted">Um atendimento. Seu tempo reservado.</p></section><div class="error" role="alert" ${error ? '' : 'hidden'}>${e(error)}</div>${notice ? `<p class="success-note" role="status">${e(notice)}</p>` : ''}${content}</div>`,
     );
