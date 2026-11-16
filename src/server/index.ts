@@ -27,6 +27,9 @@ import {
 import { hubManifest } from './hub-manifest';
 import { completeAppointment, getReceipt, registerReceipt, receiptReport } from './receipts';
 import {
+  customerSessionSeconds,
+  verificationMode,
+  simulationPhones,
   customerCookie,
   finishVerification,
   logoutCustomer,
@@ -373,8 +376,8 @@ async function api(request: Request, env: Env) {
     return json(await startVerification(request, env, shop, await body(request)), 201);
   if (path === '/customer/verify' && request.method === 'POST') {
     const result = await finishVerification(request, env, shop, await body(request));
-    return json({ maskedPhone: result.maskedPhone }, 200, {
-      'Set-Cookie': customerCookie(request, result.token, 86400, customerPath),
+    return json({ maskedPhone: result.maskedPhone, name: result.name }, 200, {
+      'Set-Cookie': customerCookie(request, result.token, customerSessionSeconds, customerPath),
     });
   }
   if (path === '/customer/logout' && request.method === 'POST') {
@@ -383,8 +386,14 @@ async function api(request: Request, env: Env) {
   }
   if (path.startsWith('/customer/')) {
     const phone = await requireCustomer(request, env, shop);
-    if (path === '/customer/session' && request.method === 'GET')
-      return json({ maskedPhone: maskedPhone(phone) });
+    if (path === '/customer/session' && request.method === 'GET') {
+      const customer = await env.DB.prepare(
+        'SELECT full_name FROM customers WHERE shop_id=? AND phone=?',
+      )
+        .bind(shop.id, phone)
+        .first<{ full_name: string }>();
+      return json({ maskedPhone: maskedPhone(phone), name: customer?.full_name || '' });
+    }
     if (path === '/customer/bookings' && request.method === 'GET')
       return json(await customerBookings(env.DB, shop, phone, url));
     const customerAction = path.match(
@@ -476,7 +485,13 @@ async function api(request: Request, env: Env) {
     return json({
       shop,
       services: await getServices(env.DB, shop.id),
-      features: { phoneVerification: Boolean(env.VERIFICATION_SENDER) },
+      features: {
+        phoneVerification: verificationMode(env) !== 'disabled',
+        verificationMode: verificationMode(env),
+        ...(verificationMode(env) === 'simulated'
+          ? { simulatedPhones: simulationPhones(env) }
+          : {}),
+      },
     });
   if (path === '/' && request.method === 'GET') return json({ shop });
   if ((path === '/availability' || path === '/admin/availability') && request.method === 'GET') {

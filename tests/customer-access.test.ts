@@ -60,7 +60,7 @@ async function book(shop = tomaz, phone = alice, time = '10:00', manual = false)
   return (await r.json<{ appointment: { id: string } }>()).appointment.id;
 }
 async function challenge(shop = tomaz, phone = alice) {
-  const r = await api(shop, '/customer/verification', { phone });
+  const r = await api(shop, '/customer/verification', { name: 'Cliente Fictício', phone });
   expect(r.status).toBe(201);
   const data = await r.json<{ challengeId: string; maskedPhone: string }>();
   const message = messages.find((m) => m.challengeId === data.challengeId)!;
@@ -103,7 +103,7 @@ describe('código pelo WhatsApp e sessão do cliente', () => {
     await book();
     const first = await challenge();
     expect(first.code).toMatch(/^\d{6}$/);
-    const r = await api(aurora, '/customer/verification', { phone: bob });
+    const r = await api(aurora, '/customer/verification', { name: 'Cliente Fictício', phone: bob });
     expect(r.status).toBe(201);
     const response = await r.json<Record<string, unknown>>();
     expect(Object.keys(response).sort()).toEqual([
@@ -135,7 +135,7 @@ describe('código pelo WhatsApp e sessão do cliente', () => {
       'SameSite=Strict',
       'Secure',
       'Path=/api/shops/tomaz-barber/customer',
-      'Max-Age=86400',
+      'Max-Age=2592000',
     ])
       expect(cookie).toContain(part);
     const session = cookie.split(';')[0];
@@ -174,7 +174,10 @@ describe('código pelo WhatsApp e sessão do cliente', () => {
   });
   it('exige intervalo de reenvio e invalida o código anterior ao reenviar', async () => {
     const d = await challenge();
-    expect((await api(tomaz, '/customer/verification', { phone: alice })).status).toBe(429);
+    expect(
+      (await api(tomaz, '/customer/verification', { name: 'Cliente Fictício', phone: alice }))
+        .status,
+    ).toBe(429);
     expect(messages).toHaveLength(1);
     await env.DB.prepare('UPDATE phone_challenges SET created_at=unixepoch()-61').run();
     const next = await challenge();
@@ -186,26 +189,37 @@ describe('código pelo WhatsApp e sessão do cliente', () => {
       await challenge();
       await env.DB.prepare('UPDATE phone_challenges SET created_at=unixepoch()-61').run();
     }
-    expect((await api(tomaz, '/customer/verification', { phone: alice })).status).toBe(429);
+    expect(
+      (await api(tomaz, '/customer/verification', { name: 'Cliente Fictício', phone: alice }))
+        .status,
+    ).toBe(429);
     await challenge(aurora);
     for (let n = 0; n < 15; n++) await challenge(tomaz, `7598888${String(n).padStart(4, '0')}`);
-    expect((await api(tomaz, '/customer/verification', { phone: bob })).status).toBe(429);
+    expect(
+      (await api(tomaz, '/customer/verification', { name: 'Cliente Fictício', phone: bob })).status,
+    ).toBe(429);
   });
   it('mantém a reserva e não autentica quando o remetente falha ou não está configurado', async () => {
     const id = await book();
-    const r = await worker.fetch(request(tomaz, '/customer/verification', { phone: alice }), {
-      ...testEnv(),
-      VERIFICATION_SENDER: {
-        fetch: async () => new Response('', { status: 503 }),
-      } as unknown as Fetcher,
-    });
+    const r = await worker.fetch(
+      request(tomaz, '/customer/verification', { name: 'Cliente Fictício', phone: alice }),
+      {
+        ...testEnv(),
+        VERIFICATION_SENDER: {
+          fetch: async () => new Response('', { status: 503 }),
+        } as unknown as Fetcher,
+      },
+    );
     expect(r.status).toBe(503);
     expect(
       (
-        await worker.fetch(request(aurora, '/customer/verification', { phone: alice }), {
-          ...testEnv(),
-          VERIFICATION_SENDER: undefined,
-        })
+        await worker.fetch(
+          request(aurora, '/customer/verification', { name: 'Cliente Fictício', phone: alice }),
+          {
+            ...testEnv(),
+            VERIFICATION_SENDER: undefined,
+          },
+        )
       ).status,
     ).toBe(503);
     expect(
@@ -223,12 +237,14 @@ describe('código pelo WhatsApp e sessão do cliente', () => {
   });
   it('exige origem correta e valida o celular e os seis dígitos', async () => {
     for (const phone of ['123', {}, '75999999999999999999999999999999999999'])
-      expect((await api(tomaz, '/customer/verification', { phone })).status).toBe(400);
+      expect(
+        (await api(tomaz, '/customer/verification', { name: 'Cliente Fictício', phone })).status,
+      ).toBe(400);
     expect(
       (await api(tomaz, '/customer/verify', { challengeId: crypto.randomUUID(), code: '123' }))
         .status,
     ).toBe(400);
-    const r = request(tomaz, '/customer/verification', { phone: alice });
+    const r = request(tomaz, '/customer/verification', { name: 'Cliente Fictício', phone: alice });
     r.headers.set('Origin', 'https://outro.test');
     expect((await worker.fetch(r, testEnv())).status).toBe(403);
   });

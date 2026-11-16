@@ -16,7 +16,7 @@ Na remarcação, a disponibilidade é a do cliente, incluindo faixas ocultas e b
 
 Permanece a regra de cancelamento sem custo com pelo menos duas horas de antecedência. Alterações dentro desse prazo continuam dependendo de decisão do salão pelo hub; não há cobrança automática. A taxa de falta continua presencial.
 
-**Meus horários** mantém a sessão de 24 horas por telefone verificado e estabelecimento. Sem remetente de verificação configurado, a tela orienta a usar o link privado da reserva. O remetente simulado continua exclusivo dos testes anteriores; não habilita envios Meta. A futura decisão sobre verificação de telefone permanece separada do acesso por link.
+**Meus horários** agora é a [conta do cliente](conta-cliente.md), com nome, posse do número por código e sessão de 30 dias. O transporte real preparado é SMS; o piloto oferece simulação restrita a números fictícios. O acesso pelo link individual continua independente e não libera o histórico do telefone.
 
 ## Hub no celular
 

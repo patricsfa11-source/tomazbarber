@@ -2236,3 +2236,82 @@ input[type='checkbox'] {
 .service-settings li {
   overflow-wrap: anywhere;
 }
+
+/* Shared receipt hierarchy for confirmation, private reservation and customer account. */
+.reservation-summary {
+  text-align: left;
+  min-width: 0;
+}
+.reservation-summary .reservation-status {
+  display: inline-flex;
+  width: auto;
+  padding: 5px 10px;
+  margin: 0 0 18px;
+  font-size: 12px;
+  line-height: 1.3;
+  border: 1px solid #5c583e;
+  border-radius: 999px;
+  color: #e1bf79;
+  background: #29281f;
+}
+.reservation-summary .reservation-status.cancelled {
+  color: #dfb1a3;
+  border-color: #66483e;
+}
+.reservation-summary h2 {
+  margin: 0 0 16px;
+  font-size: clamp(24px, 6vw, 32px);
+  line-height: 1.2;
+}
+.reservation-summary .reservation-date {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+.reservation-summary .reservation-interval {
+  display: block;
+  font-size: 26px;
+  margin-bottom: 20px;
+  color: #e1bf79;
+}
+.reservation-summary .reservation-price {
+  border-top: 1px solid #42433a;
+  padding-top: 16px;
+}
+.reservation-summary .reservation-price p {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+.reservation-summary .reservation-price .note {
+  font-size: 13px;
+}
+.reservation-summary .reservation-code {
+  display: block;
+  margin-top: 20px;
+  font-size: 11px;
+  opacity: 0.65;
+}
+.confirmation .account-receipt-link {
+  display: flex;
+  margin: 24px auto 12px;
+  max-width: 440px;
+}
+.confirmation .my-receipt-link {
+  display: inline-flex;
+  padding: 12px;
+}
+.my-booking-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-top: 1px solid #42433a;
+  padding-top: 16px;
+  margin-top: 20px;
+}
+.simulation-code {
+  padding: 16px;
+  border: 1px dashed #e1bf79;
+  color: #e1bf79;
+}
+.verify-card .preserve-note {
+  overflow-wrap: anywhere;
+}
