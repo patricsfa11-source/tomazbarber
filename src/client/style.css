@@ -2055,3 +2055,124 @@ input[type='checkbox'] {
     font-size: 0.74rem;
   }
 }
+/* Caixa do estabelecimento: cartões e relatórios legíveis no celular. */
+.receipts-layout {
+  max-width: 840px;
+  margin: 32px auto 0;
+}
+.cash-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.cash-summary section {
+  background: var(--surface, #1c201b);
+  border: 1px solid #353b31;
+  padding: 22px 16px;
+}
+.cash-summary span,
+.cash-summary small {
+  display: block;
+  color: #a5aa9e;
+}
+.cash-summary strong {
+  display: block;
+  font-size: clamp(22px, 5vw, 36px);
+  color: #d6b46a;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.cash-summary small {
+  font-size: 11px;
+  line-height: 1.5;
+}
+.cash-total,
+.settings-card .cash-total {
+  font-size: clamp(30px, 7vw, 48px);
+  color: #d6b46a;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  margin: 16px 0;
+}
+.receipt-period {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.receipt-period input {
+  width: 100%;
+  min-width: 0;
+}
+.receipt-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  border-bottom: 1px solid #353b31;
+  padding: 12px 0;
+}
+.receipt-tabs [aria-pressed='true'] {
+  color: #d6b46a;
+  text-decoration: underline;
+  text-underline-offset: 7px;
+}
+.receipt-groups,
+.receipt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.receipt-groups li,
+.receipt-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+  border-bottom: 1px solid #353b31;
+  padding: 20px 0;
+}
+.receipt-groups li > div,
+.receipt-list li > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.receipt-groups li > strong,
+.receipt-list li > strong {
+  flex-shrink: 0;
+  color: #d6b46a;
+}
+.receipt-groups small,
+.receipt-list span,
+.receipt-list small {
+  display: block;
+  color: #a5aa9e;
+  margin-top: 6px;
+}
+.receipt-list small {
+  font-size: 12px;
+}
+.receipt-appointment form {
+  margin-top: 24px;
+}
+.receipt-appointment input,
+.receipt-appointment select {
+  width: 100%;
+}
+.agenda-payment {
+  grid-column: 2 / -1;
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.hub-tabs {
+  flex-wrap: wrap;
+}
+@media (max-width: 360px) {
+  .cash-summary {
+    grid-template-columns: 1fr;
+  }
+  .receipt-groups li,
+  .receipt-list li {
+    flex-wrap: wrap;
+  }
+}

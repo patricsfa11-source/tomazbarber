@@ -5,7 +5,7 @@ export interface CustomerBooking {
   duration: number;
   startsAt: number;
   endsAt: number;
-  status: 'confirmed' | 'cancelled';
+  status: 'confirmed' | 'cancelled' | 'completed';
   version: number;
   canReschedule: boolean;
   canCancel: boolean;
