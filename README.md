@@ -9,6 +9,7 @@ Sistema de agendamento com dados separados por estabelecimento. A TOMAZ BARBER �
 - [Separação por estabelecimento](docs/estabelecimentos.md) — links, acesso, migração e validação do isolamento.
 - [Gestão de agenda](docs/gestao-agenda.md) — expediente editável, bloqueios por canal, reservas afetadas, remarcação, cancelamento e preparação dos lembretes.
 - [Meus horários](docs/meus-horarios.md) — proposta de verificação pelo WhatsApp, acesso privado do cliente e regras para alterações.
+- [Cliente e hub instalável](docs/cliente-hub.md) — reserva por link privado, instalação, cadastro, divulgação e validação sem Meta.
 
 ## Primeira etapa implementada
 
@@ -22,6 +23,9 @@ Sistema de agendamento com dados separados por estabelecimento. A TOMAZ BARBER �
 - **Configurar agenda** no hub: semana, pausas, horários especiais por data/período, faixas ocultas só no link e bloqueios nos dois canais. As alterações têm prévia e preservam as reservas confirmadas afetadas.
 - **Remarcar**, **Cancelar** e **Ver histórico** na agenda. A remarcação ocupa o novo horário antes de liberar o antigo; o cancelamento libera a faixa e mantém o registro.
 - **Meus horários** em `/s/<slug>/meus-horarios`: código temporário pelo WhatsApp, sessão por número e estabelecimento, remarcação e cancelamento com histórico. O remetente é simulado nos testes; o agendamento continua pedindo apenas nome e celular.
+- **Link privado da reserva** na confirmação: consulta, remarcação e cancelamento de um único atendimento, sem depender de envio de código. Nome ou telefone sozinhos não autorizam acesso.
+- **Hub instalável** por estabelecimento, com instruções para Android/iPhone e tela de reconexão sem cache de clientes ou agenda.
+- Cadastro de clientes sem reserva, preenchimento de encaixes e divulgação com link público, WhatsApp manual e QR Code para baixar.
 
 ## Executar localmente
 
@@ -52,9 +56,9 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-`check` executa TypeScript, build e 92 testes da API no runtime Workers com D1 local. A suíte cobre migração, isolamento, conflitos de reserva e remarcação, cancelamento, histórico, lembretes, expediente, pausas, exceções, regras por canal, prévias protegidas contra alterações concorrentes e verificação do telefone com acesso às próprias reservas.
+`check` executa TypeScript, build e 105 testes da API no runtime Workers com D1 local. A suíte cobre migração, isolamento, conflitos de reserva e remarcação, cancelamento, histórico, lembretes, expediente, pausas, exceções, regras por canal, prévias protegidas contra alterações concorrentes, verificação do telefone e acesso privado por reserva.
 
-O Playwright inicia a aplicação na porta 8788 e o remetente simulado na porta 8790, usa senhas fictícias diferentes para os dois estabelecimentos e recria apenas `work/e2e/`. Não acessa o banco de desenvolvimento. Os 12 testes exercitam os fluxos anteriores e Meus horários, incluindo telas de 320 e 390 pixels. Para usar Chromium já instalado, defina `CHROMIUM_PATH` com o caminho do executável. Capturas da execução ficam em `test-results/`; as prévias de [gestão da agenda](docs/previas-agenda/README.md) e [Meus horários](docs/previas-meus-horarios/README.md) são seleções versionadas. O remetente de teste e `wrangler.e2e.jsonc` não devem ser publicados.
+O Playwright inicia a aplicação na porta 8788 e o remetente simulado na porta 8790, usa senhas fictícias diferentes para os dois estabelecimentos e recria apenas `work/e2e/`. Não acessa o banco de desenvolvimento. Os 15 testes exercitam os fluxos anteriores, Meus horários e o fluxo sem Meta, incluindo telas de 320 e 390 pixels, QR Codes e reconexão. Para usar Chromium já instalado, defina `CHROMIUM_PATH` com o caminho do executável. Capturas da execução ficam em `test-results/`; veja as seleções de [cliente e hub instalável](docs/previas-cliente-hub/README.md), [gestão da agenda](docs/previas-agenda/README.md) e [Meus horários](docs/previas-meus-horarios/README.md). O remetente de teste e `wrangler.e2e.jsonc` não devem ser publicados.
 
 ## Decisões de implementação
 
@@ -70,6 +74,6 @@ A logo original está em `public/tomaz-barber-logo.jpg` e aparece no cabeçalho 
 
 ## Pendências das próximas etapas
 
-PWA, financeiro, notificações e gestão de equipes continuam nas próximas etapas. Meus horários já permite alterações depois de verificar o celular. A regra de cancelamentos tardios continua pendente; por enquanto, alterações com menos de duas horas dependem de decisão direta do salão pelo hub, sem cobrança automática.
+O hub já tem instalação como PWA e deve passar pelo piloto em aparelho físico. Financeiro, notificações e gestão de equipes continuam nas próximas etapas. Meus horários já permite alterações depois de verificar o celular; o link privado permite gerenciar uma única reserva sem verificação do telefone. A regra de cancelamentos tardios continua pendente; por enquanto, alterações com menos de duas horas dependem de decisão direta do salão pelo hub, sem cobrança automática.
 
 WhatsApp e publicação ficam para as etapas seguintes. Neste ambiente, a confirmação aparece somente na tela, sem enviar mensagens. Criações, remarcações e cancelamentos já registram histórico, estado desejado do lembrete e eventos duráveis para a futura integração. Não há cobrança automática. A configuração real de acesso, proteção contra abuso da API pública e o piloto com o barbeiro devem ser preparados antes de divulgar um link.

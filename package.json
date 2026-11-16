@@ -19,10 +19,17 @@
     "@cloudflare/vitest-plugin": "^1.8.2",
     "@cloudflare/workers-types": "^5.20261113.1",
     "@playwright/test": "^1.65.0",
+    "@types/pngjs": "^6.0.5",
+    "@types/qrcode": "^1.5.6",
+    "jsqr": "^1.4.0",
+    "pngjs": "^7.0.0",
     "prettier": "^3.10.1",
     "typescript": "^7.0.2",
     "vite": "^7.3.8",
     "vitest": "^4.1.12",
     "wrangler": "^4.162.0"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
   }
 }

@@ -14,7 +14,16 @@ import {
   mutateAppointment,
 } from './appointments';
 import { hash } from './crypto';
-import { normalizePhone } from './phone';
+import { customerInput, registerCustomer } from './customers';
+import {
+  privateBookingLink,
+  openBookingLink,
+  requireBookingLink,
+  closeBookingLink,
+  bookingLinkCookie,
+  revokeBookingLink,
+} from './booking-links';
+import { hubManifest } from './hub-manifest';
 import {
   customerCookie,
   finishVerification,
@@ -184,14 +193,7 @@ function parseBooking(data: Record<string, unknown>): BookingInput {
     !/^[a-f0-9-]{36}$/i.test(data.requestKey)
   )
     throw new ApiError(400, 'Confira os dados da reserva.');
-  const name = data.name.trim().replace(/\s+/g, ' ');
-  if (
-    name.length < 5 ||
-    name.length > 100 ||
-    !/^\p{L}[\p{L}\p{M}'’-]+(?: [\p{L}\p{M}'’-]+)+$/u.test(name)
-  )
-    throw new ApiError(400, 'Informe seu nome completo.');
-  const phone = normalizePhone(data.phone);
+  const { name, phone } = customerInput(data);
   return {
     name,
     phone,
@@ -207,7 +209,7 @@ async function book(request: Request, env: Env, shop: Shop, origin: 'link' | 'hu
     env.DB.prepare('SELECT * FROM appointments WHERE shop_id = ? AND request_key = ?')
       .bind(shop.id, input.requestKey)
       .first<Appointment>();
-  const replay = (a: Appointment) => {
+  const replay = async (a: Appointment) => {
     if (a.request_fingerprint !== fingerprint)
       throw new ApiError(
         409,
@@ -218,7 +220,13 @@ async function book(request: Request, env: Env, shop: Shop, origin: 'link' | 'hu
         409,
         'A reserva desta solicitação já foi cancelada. Escolha um novo horário.',
       );
-    return json({ appointment: receipt(a), replayed: true });
+    return json({
+      appointment: {
+        ...receipt(a),
+        manageUrl: await privateBookingLink(env.DB, shop, a.id, input.requestKey),
+      },
+      replayed: true,
+    });
   };
   const previous = await existing();
   if (previous) return replay(previous);
@@ -286,6 +294,7 @@ async function book(request: Request, env: Env, shop: Shop, origin: 'link' | 'hu
         duration: service.duration,
         startsAt: input.startsAt,
         endsAt: input.startsAt + service.duration * 60,
+        manageUrl: await privateBookingLink(env.DB, shop, id, input.requestKey),
       },
       replayed: false,
     },
@@ -301,6 +310,53 @@ async function api(request: Request, env: Env) {
   // Rotas antigas são aliases exclusivos da TOMAZ; nunca consultam dados globais.
   const path = match ? match[2] || '/' : url.pathname.slice('/api'.length);
   const adminPath = match ? `/api/shops/${shop.slug}/admin` : '/api/admin';
+  const privateRoute = path.match(
+    /^\/booking-access\/([a-f0-9-]{36})(?:\/(session|logout|availability|reschedule|cancel))?$/,
+  );
+  if (privateRoute) {
+    const [, id, action] = privateRoute;
+    const cookiePath = `${match ? `/api/shops/${shop.slug}` : '/api'}/booking-access/${id}`;
+    if (action === 'session' && request.method === 'POST') {
+      const token = await openBookingLink(request, env.DB, shop, id, await body(request));
+      return json({ ok: true }, 200, {
+        'Set-Cookie': bookingLinkCookie(request, token, 86400, cookiePath),
+      });
+    }
+    if (action === 'logout' && request.method === 'POST') {
+      await closeBookingLink(request, env.DB, shop, id);
+      return json({ ok: true }, 200, {
+        'Set-Cookie': bookingLinkCookie(request, '', 0, cookiePath),
+      });
+    }
+    await requireBookingLink(request, env.DB, shop, id);
+    const appointment = await getAppointment(env.DB, shop, id);
+    if (!action && request.method === 'GET')
+      return json({ appointment: customerReceipt(appointment) });
+    if (action === 'availability' && request.method === 'GET') {
+      if (appointment.status !== 'confirmed')
+        throw new ApiError(409, 'A reserva já foi cancelada.');
+      const date = url.searchParams.get('date');
+      validateDate(date, Date.now(), shop.timezone);
+      return json({
+        slots: await available(env.DB, shop, date, appointment.duration_minutes, 'link', id),
+      });
+    }
+    if ((action === 'reschedule' || action === 'cancel') && request.method === 'POST') {
+      const result = await mutateAppointment(
+        env.DB,
+        shop,
+        id,
+        action,
+        await body(request),
+        appointment.customer_phone,
+      );
+      return json({
+        appointment: customerReceipt(result.appointment as AppointmentRecord),
+        replayed: result.replayed,
+      });
+    }
+    throw new ApiError(404, 'Página não encontrada.');
+  }
   // O acesso do cliente usa uma sessão própria, vinculada ao telefone verificado
   // e ao salão. Nunca aceita customerId/phone enviados como autorização.
   const customerPath = match ? `/api/shops/${shop.slug}/customer` : '/api/customer';
@@ -357,6 +413,14 @@ async function api(request: Request, env: Env) {
   if (path === '/admin/login' && request.method === 'POST')
     return login(request, env, shop, adminPath);
   if (path.startsWith('/admin/')) await requireAdmin(request, env, shop);
+  if (path === '/admin/customers' && request.method === 'POST')
+    return json(await registerCustomer(env.DB, shop, await body(request)), 201);
+  const revoke = path.match(/^\/admin\/bookings\/([^/]+)\/access\/revoke$/);
+  if (revoke && request.method === 'POST') {
+    await getAppointment(env.DB, shop, revoke[1]);
+    await revokeBookingLink(env.DB, shop, revoke[1]);
+    return json({ ok: true });
+  }
   if (path === '/admin/schedule' && request.method === 'GET')
     return json(await scheduleView(env.DB, shop));
   if (path === '/admin/schedule/preview' && request.method === 'POST')
@@ -375,7 +439,11 @@ async function api(request: Request, env: Env) {
       ),
     );
   if (path === '/services' && request.method === 'GET')
-    return json({ shop, services: await getServices(env.DB, shop.id) });
+    return json({
+      shop,
+      services: await getServices(env.DB, shop.id),
+      features: { phoneVerification: Boolean(env.VERIFICATION_SENDER) },
+    });
   if (path === '/' && request.method === 'GET') return json({ shop });
   if ((path === '/availability' || path === '/admin/availability') && request.method === 'GET') {
     const date = url.searchParams.get('date');
@@ -472,8 +540,15 @@ async function api(request: Request, env: Env) {
 }
 async function page(request: Request, env: Env) {
   const path = new URL(request.url).pathname;
+  const manifest = path.match(/^\/s\/([^/]+)\/hub\.webmanifest$/);
+  if (manifest)
+    return Response.json(hubManifest(await getShop(env.DB, manifest[1])), {
+      headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-cache' },
+    });
   if (path.startsWith('/s/')) {
-    const match = path.match(/^\/s\/([^/]+)(?:\/hub|\/meus-horarios)?\/?$/);
+    const match = path.match(
+      /^\/s\/([^/]+)(?:\/hub|\/meus-horarios|\/reserva\/[a-f0-9-]{36})?\/?$/,
+    );
     if (!match) throw new ApiError(404, 'Página não encontrada.');
     await getShop(env.DB, match[1]);
   }
@@ -487,7 +562,11 @@ export default {
         : await page(request, env);
       const secured = new Response(response.body, response);
       secured.headers.set('X-Frame-Options', 'DENY');
-      secured.headers.set('Referrer-Policy', 'same-origin');
+      secured.headers.set('Referrer-Policy', 'no-referrer');
+      if (/\/(hub|reserva\/)/.test(new URL(request.url).pathname))
+        secured.headers.set('Cache-Control', 'no-store');
+      if (new URL(request.url).pathname === '/hub-sw.js')
+        secured.headers.set('Cache-Control', 'no-cache');
       secured.headers.set('X-Content-Type-Options', 'nosniff');
       secured.headers.set(
         'Content-Security-Policy',
