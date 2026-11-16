@@ -1,3 +1,4 @@
+import '@fontsource-variable/geist/wght.css';
 import './style.css';
 import { createAgendaManagement } from './agenda-management';
 import { createMyBookings } from './my-bookings';
@@ -5,6 +6,7 @@ import { createReservationAccess } from './reservation-access';
 import { createHubTools } from './hub-tools';
 import { copyText } from './clipboard';
 import { createReceipts } from './receipts';
+import { serviceIcon } from './service-icons';
 import { money, paymentMethods } from '../finance';
 import type { AppointmentRecord } from '../calendar';
 import {
@@ -178,7 +180,7 @@ function publicCatalog(): string {
           (
             service,
           ) => `<li data-service-name="${escape(searchKey(service.name))}" ${searchKey(service.name).includes(searchKey(state.serviceQuery)) ? '' : 'hidden'}>
-        <span class="shop-service-icon" aria-hidden="true">✂</span>
+        <span class="shop-service-icon" aria-hidden="true">${serviceIcon(service.id)}</span>
         <div class="shop-service-info"><h2>${escape(service.name)}</h2><p><span>${escape(service.price)}</span><small>${service.duration} min</small></p></div>
         <button type="button" class="primary shop-book" data-public-service="${escape(service.id)}" aria-label="Agendar ${escape(service.name)}">Agendar</button>
       </li>`,

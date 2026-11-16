@@ -1,11 +1,12 @@
 :root {
-  font-family: Arial, Helvetica, sans-serif;
-  color: #eeeee8;
+  font-family: 'Geist Variable', system-ui, sans-serif;
+  color: #f3f2eb;
   background: #121412;
   font-synthesis: none;
-  --gold: #d5b36b;
-  --muted: #a5a89e;
-  --line: #34382f;
+  --gold: #e1bf79;
+  --muted: #b8bcb1;
+  --line: #3c4238;
+  --control-line: #6b7263;
   --panel: #1b1e19;
   --dark: #121412;
 }
@@ -232,17 +233,18 @@ h3 {
   font-weight: 600;
 }
 h1 {
-  font-size: clamp(2.6rem, 5.3vw, 4.8rem);
-  line-height: 1.06;
-  letter-spacing: -0.06em;
+  font-size: clamp(2.25rem, 5.3vw, 4.4rem);
+  line-height: 1.08;
+  letter-spacing: -0.042em;
+  font-weight: 700;
 }
 h1 > span {
   color: var(--gold);
 }
 h2 {
   font-size: 2rem;
-  line-height: 1.18;
-  letter-spacing: -0.04em;
+  line-height: 1.2;
+  letter-spacing: -0.032em;
 }
 h3 {
   font-size: 1.1rem;
@@ -252,10 +254,10 @@ small {
 }
 .demo-bar {
   text-align: center;
-  background: #d5b36b;
+  background: var(--gold);
   color: #191b17;
-  font-size: 0.65rem;
-  letter-spacing: 0.12em;
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
   padding: 10px 14px;
   font-weight: 700;
 }
@@ -341,7 +343,7 @@ main {
   align-items: center;
   flex: 1;
   font-size: 0.8rem;
-  color: #92988b;
+  color: var(--muted);
   padding: 20px 0;
 }
 .steps li span {
@@ -548,14 +550,14 @@ main {
   background: var(--gold);
   color: #171b13;
   border: 1px solid var(--gold);
-  border-radius: 3px;
+  border-radius: 6px;
   padding: 17px 23px;
-  font-size: 0.85rem;
+  font-size: 0.9375rem;
   font-weight: 700;
   min-height: 50px;
 }
 .primary:hover {
-  background: #e2c384;
+  background: #f0d298;
   text-decoration: none;
 }
 .primary span {
@@ -590,23 +592,24 @@ main {
   display: none;
 }
 label {
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   display: block;
-  color: #d2d4cb;
+  color: #dee0d7;
 }
 input {
   display: block;
   background: var(--panel);
-  color: #eeeee8;
-  border: 1px solid #545a49;
-  border-radius: 3px;
+  color: inherit;
+  border: 1px solid var(--control-line);
+  border-radius: 6px;
   padding: 15px;
   min-height: 50px;
   max-width: 100%;
   color-scheme: dark;
 }
 input::placeholder {
-  color: #969d8c;
+  color: var(--muted);
+  opacity: 1;
 }
 .date-tools {
   display: flex;
@@ -619,19 +622,19 @@ input::placeholder {
 }
 .dates {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 8px;
   margin-top: 20px;
 }
 .date {
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-line);
   background: var(--panel);
   padding: 13px 5px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 7px;
-  border-radius: 3px;
+  border-radius: 6px;
 }
 .date small {
   text-transform: capitalize;
@@ -640,7 +643,9 @@ input::placeholder {
 }
 .date strong {
   font-size: 1.4rem;
-  font-weight: 500;
+  font-weight: 650;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
 }
 .date.selected {
   border-color: var(--gold);
@@ -651,9 +656,12 @@ input::placeholder {
   color: var(--gold);
 }
 .date-caption {
-  text-transform: capitalize;
   margin: 22px 0 30px;
-  font-size: 0.85rem;
+  font-size: 0.9375rem;
+  font-weight: 550;
+}
+.date-caption::first-letter {
+  text-transform: uppercase;
 }
 .date-caption span {
   color: var(--muted);
@@ -663,12 +671,12 @@ input::placeholder {
   margin-top: 25px;
 }
 .turn h3 {
-  font-size: 0.85rem;
+  font-size: 1rem;
   margin-bottom: 13px;
 }
 .turn h3 span {
   color: var(--muted);
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 400;
   margin-left: 10px;
 }
@@ -678,12 +686,14 @@ input::placeholder {
   gap: 9px;
 }
 .time {
-  padding: 13px 5px;
+  padding: 12px 4px;
   background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  font-size: 0.82rem;
-  min-height: 44px;
+  border: 1px solid var(--control-line);
+  border-radius: 6px;
+  font-size: 0.9375rem;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  min-height: 46px;
 }
 .time.selected {
   background: var(--gold);
@@ -797,16 +807,21 @@ input::placeholder {
   background: var(--panel);
 }
 .confirmed-details > span {
-  text-transform: capitalize;
+  display: block;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.9375rem;
+}
+.confirmed-details > span::first-letter {
+  text-transform: uppercase;
 }
 .confirmed-details > strong {
   display: block;
   font-size: 3.4rem;
   color: var(--gold);
   margin: 12px 0;
-  letter-spacing: -0.06em;
+  letter-spacing: -0.045em;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
 }
 .confirmed-details h2 {
   font-size: 1.3rem;
@@ -1284,8 +1299,8 @@ footer small {
     height: 68px;
   }
   .demo-bar {
-    font-size: 0.57rem;
-    letter-spacing: 0.06em;
+    font-size: 0.625rem;
+    letter-spacing: 0.05em;
   }
   main,
   footer {
@@ -1309,7 +1324,7 @@ footer small {
     margin-bottom: 30px;
   }
   .steps li {
-    font-size: 0.68rem;
+    font-size: clamp(0.68rem, 2.9vw, 0.8125rem);
     gap: 6px;
     padding: 17px 0;
   }
@@ -1331,7 +1346,7 @@ footer small {
     display: none;
   }
   .section-heading h2 {
-    font-size: 1.75rem;
+    font-size: clamp(1.625rem, 6.4vw, 2rem);
   }
   .section-heading > .muted {
     font-size: 0.65rem;
@@ -1391,19 +1406,19 @@ footer small {
     font-size: 0.6rem;
   }
   .date-caption {
-    font-size: 0.78rem;
-    line-height: 1.8;
+    line-height: 1.6;
   }
   .date-caption span {
     display: block;
-    font-size: 0.7rem;
+    font-size: 0.8125rem;
   }
-  .date-tools label {
-    font-size: 0.75rem;
+  .date-tools {
+    gap: 12px;
   }
   .date-tools input {
-    width: 160px;
-    font-size: 0.8rem;
+    width: min(11rem, 58%);
+    padding-inline: 10px;
+    font-size: 1rem;
   }
   .review {
     padding: 18px;
@@ -1527,8 +1542,10 @@ footer small {
   content: '';
 }
 .shop-cover h1 {
-  font-size: clamp(1.45rem, 5vw, 2rem);
-  letter-spacing: 0.02em;
+  color: #faf9f1;
+  font-size: clamp(1.5rem, 5.6vw, 2.25rem);
+  letter-spacing: -0.018em;
+  text-shadow: 0 2px 12px #000;
 }
 .shop-main {
   max-width: 760px;
@@ -1537,17 +1554,18 @@ footer small {
 }
 .shop-nav {
   display: flex;
-  gap: 24px;
-  padding: 0 20px;
+  gap: clamp(12px, 5vw, 24px);
+  padding: 0 clamp(12px, 5vw, 20px);
   border-bottom: 1px solid var(--line);
 }
 .shop-nav button {
   min-height: 46px;
   padding: 0 2px;
   border-bottom: 2px solid transparent;
-  color: #c3c3bb;
+  color: var(--muted);
   background: transparent;
-  font-weight: 700;
+  font-size: 0.875rem;
+  font-weight: 650;
 }
 .shop-nav button[aria-pressed='true'] {
   border-color: var(--gold);
@@ -1571,7 +1589,8 @@ footer small {
 }
 .shop-search span {
   position: absolute;
-  top: 14px;
+  top: 50%;
+  transform: translateY(-50%);
   left: 15px;
   width: 13px;
   height: 13px;
@@ -1595,9 +1614,10 @@ footer small {
   min-height: 46px;
   margin: 0;
   padding: 9px 12px 9px 39px;
-  border: 1px solid #41413e;
-  border-radius: 9px;
+  border: 1px solid var(--control-line);
+  border-radius: 8px;
   background: #252523;
+  font-size: 1rem;
 }
 .shop-services {
   margin: 0;
@@ -1609,9 +1629,9 @@ footer small {
   grid-template-columns: 42px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  min-height: 77px;
-  padding: 10px 0;
-  border-bottom: 1px solid #343431;
+  min-height: 80px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
 }
 .shop-service-icon {
   display: grid;
@@ -1622,12 +1642,17 @@ footer small {
   border-radius: 50%;
   background: #282318;
   color: var(--gold);
-  font-size: 1.2rem;
+}
+.shop-service-icon svg {
+  display: block;
+  width: 24px;
+  height: 24px;
 }
 .shop-service-info h2 {
   margin-bottom: 5px;
-  font-size: 1rem;
-  letter-spacing: 0;
+  font-size: 1.0625rem;
+  font-weight: 680;
+  letter-spacing: -0.02em;
 }
 .shop-service-info p {
   display: flex;
@@ -1635,20 +1660,28 @@ footer small {
   align-items: baseline;
   gap: 3px 9px;
   color: var(--gold);
-  font-size: 0.8rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+.shop-service-info p > span {
+  font-weight: 550;
 }
 .shop-service-info small,
 .shop-empty {
-  color: #c3c3bb;
+  color: var(--muted);
+}
+.shop-service-info small {
+  font-size: 0.8125rem;
 }
 .shop-empty {
   padding: 14px 0;
 }
 .shop-book.primary {
-  min-height: 44px;
-  padding: 8px 11px;
-  border-radius: 6px;
-  font-size: 0.8rem;
+  min-height: 46px;
+  padding: 8px 12px;
+  border-radius: 7px;
+  font-size: 0.875rem;
   white-space: nowrap;
 }
 @media (max-width: 360px) {

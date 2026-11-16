@@ -40,7 +40,7 @@ test('cliente reserva no celular e o hub vê a mesma reserva; encaixe some do li
   await expect(page.getByRole('heading', { name: 'Horário de atendimento' })).toBeVisible();
   await page.getByRole('button', { name: 'Serviços', exact: true }).click();
   await page.screenshot({ path: 'work/cliente-mobile.png', fullPage: true });
-  await choose(page, 'Corte com barba', '10:00');
+  await choose(page, 'Corte com barba', '10:10');
   await expect(page.getByText('R$ 38,00').first()).toBeVisible();
   await page.getByLabel('Nome completo').fill('Cliente Fictício');
   await page.getByLabel('Celular com DDD').fill('75999990000');
