@@ -57,7 +57,19 @@ export async function available(
     .bind(shop.id, 'principal', close, open, ignoreId)
     .all<{ starts_at: number; ends_at: number }>();
   const config = await getSchedule(db, shop);
-  return scheduleCandidates(config, shop, date, duration, channel).filter(
-    (start) => !results.some((a) => start < a.ends_at && start + duration * 60 > a.starts_at),
-  );
+  const durationSeconds = duration * 60;
+  const now = Date.now();
+  const slots: number[] = [];
+  let nextStart = open;
+
+  // Count from opening even today, so the public grid stays put as time passes.
+  for (const start of scheduleCandidates(config, shop, date, duration, channel, 0)) {
+    if (start < nextStart) continue;
+    const end = start + durationSeconds;
+    if (results.some((a) => start < a.ends_at && end > a.starts_at)) continue;
+
+    if (channel === 'link') nextStart = end;
+    if (start * 1000 > now) slots.push(start);
+  }
+  return slots;
 }

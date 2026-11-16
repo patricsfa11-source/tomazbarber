@@ -57,10 +57,32 @@ describe('catálogo e expediente da Bahia', () => {
       ['luzes', 60, 'A partir de R$ 60,00'],
     ]);
   });
-  it('cabe corte às 19h30 e combo apenas até 19h20', async () => {
+  it('oferece horários pela duração do serviço, sem ultrapassar o fechamento', async () => {
     expect((await slots()).at(-1)).toBe(at('19:30'));
-    expect((await slots('corte-barba')).at(-1)).toBe(at('19:20'));
-    expect((await slots())[0]).toBe(at('07:30'));
+    expect((await slots('corte-barba')).at(-1)).toBe(at('18:50'));
+    expect((await slots()).slice(0, 3)).toEqual(
+      ['07:30', '08:00', '08:30'].map((time) => at(time)),
+    );
+    expect((await slots('barba')).slice(0, 3)).toEqual(
+      ['07:30', '07:50', '08:10'].map((time) => at(time)),
+    );
+    expect((await slots('corte-barba')).slice(0, 3)).toEqual(
+      ['07:30', '08:10', '08:50'].map((time) => at(time)),
+    );
+  });
+  it('retoma a sequência do corte após uma reserva fora da grade pública', async () => {
+    const cookie = await session();
+    expect((await post('/api/admin/bookings', payload('07:50'), cookie)).status).toBe(201);
+    expect((await slots()).slice(0, 3)).toEqual(
+      ['08:20', '08:50', '09:20'].map((time) => at(time)),
+    );
+    const admin = await SELF.fetch(`${base}/api/admin/availability?date=${day}&serviceId=corte`, {
+      headers: { Cookie: cookie },
+    });
+    expect(admin.status).toBe(200);
+    expect((await admin.json<{ slots: number[] }>()).slots.slice(0, 3)).toEqual(
+      ['08:20', '08:30', '08:40'].map((time) => at(time)),
+    );
   });
   it('fecha domingo e rejeita confirmação no domingo', async () => {
     let sunday = day;
@@ -125,7 +147,7 @@ describe('agenda única e concorrência no D1', () => {
     const available = await slots('barba');
     for (const time of ['09:50', '10:00', '10:10', '10:20', '10:30'])
       expect(available).not.toContain(at(time));
-    expect(available).toContain(at('09:40'));
+    expect(available).toContain(at('09:30'));
     expect(available).toContain(at('10:40'));
     expect((await post('/api/bookings', payload('10:40', 'barba'))).status).toBe(201);
     const response = await SELF.fetch(`${base}/api/admin/bookings?date=${day}`, {

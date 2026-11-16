@@ -20,7 +20,7 @@ Sistema de agendamento com dados separados por estabelecimento. A TOMAZ BARBER �
 - `/s/salao-aurora` e `/s/salao-aurora/hub`: catálogo, expediente e painel próprios do salão fictício.
 - `/` e `/hub` continuam como atalhos exclusivos da TOMAZ BARBER.
 - API TypeScript em Cloudflare Workers; persistência em D1/SQLite com migração versionada.
-- Expediente da TOMAZ de segunda a sábado, 7h30–20h; Aurora de terça a sábado, 9h–18h, ambos em `America/Bahia`. Inícios de 10 em 10 minutos, duração completa dentro do expediente próprio e horizonte inicial de 90 dias.
+- Expediente da TOMAZ de segunda a sábado, 7h30–20h; Aurora de terça a sábado, 9h–18h, ambos em `America/Bahia`. O link oferece inícios espaçados pela duração do serviço e o hub oferece inícios de 10 em 10 minutos. A duração completa deve caber no expediente e o horizonte é de 90 dias.
 - Proteção contra sobreposição no banco e reenvio idempotente da mesma solicitação. A reserva preserva nome, duração e preço anunciado do serviço.
 - **Configurar agenda** no hub: semana, pausas, horários especiais por data/período, faixas ocultas só no link e bloqueios nos dois canais. As alterações têm prévia e preservam as reservas confirmadas afetadas.
 - **Remarcar**, **Cancelar** e **Ver histórico** na agenda. A remarcação ocupa o novo horário antes de liberar o antigo; o cancelamento libera a faixa e mantém o registro.
