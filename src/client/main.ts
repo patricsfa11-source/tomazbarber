@@ -1,3 +1,5 @@
+import '@fontsource-variable/geist/wght.css';
+import '@fontsource/instrument-serif/latin-400.css';
 import './style.css';
 import { createAgendaManagement } from './agenda-management';
 import { createMyBookings } from './my-bookings';
@@ -122,6 +124,18 @@ const bookingBase = () => (isHub ? '/api/admin' : '/api');
 const shopName = () => state.shop?.name || 'Agenda';
 const shopHours = () => (state.shop ? hoursLabel(state.shop) : '');
 const zoneLabel = () => (timezone === 'America/Bahia' ? 'Horário da Bahia' : 'Horário local');
+const iconPaths = {
+  scissors: '<circle cx="6" cy="6" r="3"/><path d="M8.1 8.1 19 19M14 10l5-5M8.1 15.9l3.1-3.1"/><circle cx="6" cy="18" r="3"/>',
+  razor: '<path d="m7 5 9 9-5 5a2 2 0 1 1-3-3l3-3M5 7l2-2 3-2 9 9-3 2"/>',
+  sparkle: '<path d="M12 3c0 5-3 8-8 9 5 1 8 4 8 9 1-5 4-8 9-9-5-1-8-4-9-9ZM19 3v4m-2-2h4"/>',
+  search: '<circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4 4"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  calendar: '<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3.5v3M16 3.5v3M4 10h16"/>',
+  arrow: '<path d="M5 12h13m-5-5 5 5-5 5"/>',
+};
+function icon(name: keyof typeof iconPaths): string {
+  return `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">${iconPaths[name]}</svg>`;
+}
 function brand(): string {
   return `<a class="brand" href="${publicPath}" aria-label="${escape(shopName())}, início">${state.shop?.logoUrl ? `<img src="${escape(state.shop.logoUrl)}" width="900" height="1600" alt="" />` : `<span class="brand-name">${escape(shopName())}</span>`}</a>`;
 }
@@ -132,9 +146,18 @@ function publicCover(): string {
     .slice(0, 2)
     .map((word) => word[0])
     .join('');
-  return `<header class="shop-cover">${state.shop.logoUrl ? `<img src="${escape(state.shop.logoUrl)}" width="900" height="1600" alt="" fetchpriority="high">` : `<span class="shop-initials" aria-hidden="true">${escape(initials)}</span>`}<h1>${escape(shopName())}</h1></header>`;
+  const isTomaz = state.shop.slug === 'tomaz-barber';
+  return `<header class="shop-cover${isTomaz ? ' shop-cover-photo' : ''}">
+    ${isTomaz ? `<picture class="shop-cover-media"><source media="(max-width: 540px)" srcset="/tomaz-cover-mobile.webp"><img src="/tomaz-cover.webp" width="1440" height="960" alt="" fetchpriority="high"></picture>` : ''}
+    <div class="shop-cover-content">
+      ${state.shop.logoUrl ? `<span class="shop-cover-logo"><img src="${escape(state.shop.logoUrl)}" width="900" height="1600" alt=""></span>` : `<span class="shop-initials" aria-hidden="true">${escape(initials)}</span>`}
+      <h1>${escape(shopName())}</h1>
+      <p>${icon('clock')}${escape(shopHours())}</p>
+    </div>
+  </header>`;
 }
 function shell(content: string): void {
+  app.classList.toggle('public-app', !isHub);
   app.innerHTML = `<div class="demo-bar">AMBIENTE DE TESTE <span>·</span> Utilize apenas dados fictícios</div>
     ${!isHub && !isCustomer && !isPrivate && state.step === 1 ? publicCover() : `<header>${brand()}<nav aria-label="Navegação principal"><a href="${publicPath}" ${!isHub && !isCustomer && !isPrivate ? 'aria-current="page"' : ''}>Agendar</a><a href="${customerPath}" ${isCustomer ? 'aria-current="page"' : ''}>Meus horários</a>${isCustomer ? '' : `<a href="${hubPath}" ${isHub ? 'aria-current="page"' : ''}>${shopSlug === 'tomaz-barber' ? 'Hub do barbeiro' : 'Painel do salão'} <span aria-hidden="true">→</span></a>`}</nav></header>`}
     <main${!isHub && !isCustomer && !isPrivate && state.step === 1 ? ' class="shop-main"' : ''}>${isHub ? hubTools.render() : ''}${content}</main><footer><span>${escape(shopName())}</span><p>${escape(shopHours())}<br>${zoneLabel()}</p><small>Feito para cuidar do seu tempo.</small></footer>`;
@@ -165,24 +188,28 @@ function publicCatalog(): string {
   return `<nav class="shop-nav" aria-label="Informações do estabelecimento">
     <button type="button" data-action="services" aria-pressed="${!state.shopDetails}">Serviços</button>
     <button type="button" data-action="details" aria-pressed="${state.shopDetails}">Detalhes</button>
-    <a href="${customerPath}">Meus horários</a>
+    <a href="${customerPath}">${icon('calendar')}Meus horários</a>
   </nav>
   ${
     state.shopDetails
       ? `<section class="shop-details"><h2>Horário de atendimento</h2><p>${escape(shopHours())}</p><p>${zoneLabel()}</p></section>`
       : `<section class="shop-catalog" aria-label="Serviços">
       ${errorBox()}
-      <div class="shop-search"><span aria-hidden="true"></span><input id="service-search" type="search" aria-label="Pesquisar serviço" placeholder="Pesquisar serviço..." value="${escape(state.serviceQuery)}"></div>
+      <div class="shop-search">${icon('search')}<input id="service-search" type="search" aria-label="Pesquisar serviço" placeholder="Pesquisar serviço…" value="${escape(state.serviceQuery)}"></div>
       <ul class="shop-services">${state.services
-        .map(
-          (
-            service,
-          ) => `<li data-service-name="${escape(searchKey(service.name))}" ${searchKey(service.name).includes(searchKey(state.serviceQuery)) ? '' : 'hidden'}>
-        <span class="shop-service-icon" aria-hidden="true">✂</span>
-        <div class="shop-service-info"><h2>${escape(service.name)}</h2><p><span>${escape(service.price)}</span><small>${service.duration} min</small></p></div>
-        <button type="button" class="primary shop-book" data-public-service="${escape(service.id)}" aria-label="Agendar ${escape(service.name)}">Agendar</button>
-      </li>`,
-        )
+        .map((service) => {
+          const [price, ...alternatives] = service.price.split(' · ');
+          const glyph = /^(pigmentacao|luzes|escova)$/.test(service.id)
+            ? 'sparkle'
+            : /^(barba|pe|pe-barba)$/.test(service.id)
+              ? 'razor'
+              : 'scissors';
+          return `<li data-service-name="${escape(searchKey(service.name))}" ${searchKey(service.name).includes(searchKey(state.serviceQuery)) ? '' : 'hidden'}>
+        <span class="shop-service-icon">${icon(glyph)}</span>
+        <div class="shop-service-info"><h2>${escape(service.name)}</h2><small>${icon('clock')}${service.duration} min</small><p>${escape(price)}${alternatives.length ? `<span>${escape(alternatives.join(' · '))}</span>` : ''}</p></div>
+        <button type="button" class="primary shop-book" data-public-service="${escape(service.id)}" aria-label="Agendar ${escape(service.name)}">Agendar${icon('arrow')}</button>
+      </li>`;
+        })
         .join('')}</ul>
       <p class="shop-empty" role="status" ${state.services.some((service) => searchKey(service.name).includes(searchKey(state.serviceQuery))) ? 'hidden' : ''}>Nenhum serviço encontrado.</p>
     </section>`
