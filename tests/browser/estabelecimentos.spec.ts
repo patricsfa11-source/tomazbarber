@@ -53,12 +53,13 @@ test('links próprios preservam a TOMAZ, mostram catálogos e horários certos e
     await expect(page).toHaveTitle(`${shop.name} · Seu próximo horário`);
     await expect(page.locator('[data-public-service]')).toHaveCount(shop.count);
     if (shop.slug === 'tomaz-barber') {
-      const media = page.locator('.shop-cover-media img');
-      const logo = page.locator('.shop-cover-logo img');
-      await expect(media).toBeVisible();
-      await expect(logo).toBeVisible();
+      await expect(page.locator('.shop-cover img')).toBeVisible();
       await expect
-        .poll(() => media.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
+        .poll(() =>
+          page
+            .locator('.shop-cover img')
+            .evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
+        )
         .toBe(true);
     } else await expect(page.getByText('Corte masculino', { exact: true })).toHaveCount(0);
     await page.screenshot({ path: `work/${shop.slug}-publico.png`, fullPage: true });

@@ -36,8 +36,6 @@
     "wrangler": "^4.162.0"
   },
   "dependencies": {
-    "@fontsource-variable/geist": "^5.3.0",
-    "@fontsource/instrument-serif": "^5.3.0",
     "qrcode": "^1.5.4"
   }
 }
