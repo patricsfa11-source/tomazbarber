@@ -7,7 +7,7 @@ import { validateDate } from './schedule';
 import { lateChangeNotice } from '../customer';
 
 export const appointmentColumns =
-  'id,shop_id,professional_id,customer_id,customer_name,customer_phone,service_name,price_label,duration_minutes,starts_at,ends_at,origin,booking_channel,status,version,cancelled_at';
+  'id,shop_id,professional_id,customer_id,customer_name,customer_phone,service_name,price_label,duration_minutes,starts_at,ends_at,origin,booking_channel,status,version,cancelled_at,completed_at';
 export async function getAppointment(
   db: D1Database,
   shop: Shop,
@@ -117,6 +117,11 @@ export async function mutateAppointment(
   };
   const repeated = await replay();
   if (repeated) return repeated;
+  if (current.completed_at)
+    throw new ApiError(
+      409,
+      'Este atendimento já foi concluído e não pode ser remarcado ou cancelado.',
+    );
   if (current.version !== expectedVersion || current.status !== 'confirmed')
     throw new ApiError(409, 'Esta reserva já foi alterada ou cancelada. Recarregue os dados.');
   // Até a definição da regra tardia, nenhuma alteração autônoma libera um atendimento
@@ -190,6 +195,8 @@ export async function mutateAppointment(
     if (repeated) return repeated;
     if (String(error).includes('UNIQUE constraint failed: occupied_segments.'))
       throw new ApiError(409, 'O novo intervalo está ocupado. A reserva original foi preservada.');
+    if (String(error).includes('BOOKING_COMPLETED'))
+      throw new ApiError(409, 'Este atendimento já foi concluído. Recarregue a agenda.');
     if (String(error).includes('SCHEDULE_CHANGED'))
       throw new ApiError(
         409,

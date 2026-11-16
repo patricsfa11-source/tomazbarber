@@ -5,7 +5,10 @@ import { appointmentColumns, getAppointment } from './appointments';
 import { ApiError } from './errors';
 
 export function customerReceipt(a: AppointmentRecord): CustomerBooking {
-  const canChange = a.status === 'confirmed' && a.starts_at >= Math.floor(Date.now() / 1000) + 7200;
+  const canChange =
+    !a.completed_at &&
+    a.status === 'confirmed' &&
+    a.starts_at >= Math.floor(Date.now() / 1000) + 7200;
   return {
     id: a.id,
     service: a.service_name,
@@ -13,7 +16,7 @@ export function customerReceipt(a: AppointmentRecord): CustomerBooking {
     duration: a.duration_minutes,
     startsAt: a.starts_at,
     endsAt: a.ends_at,
-    status: a.status,
+    status: a.completed_at ? 'completed' : a.status,
     version: a.version,
     canCancel: canChange,
     canReschedule: canChange,
@@ -43,7 +46,7 @@ export async function customerBookings(
   const order = upcoming ? 'ASC' : 'DESC';
   const { results } = await db
     .prepare(
-      `SELECT ${appointmentColumns} FROM appointments WHERE shop_id=? AND customer_phone=? AND ${upcoming ? "status='confirmed' AND starts_at>unixepoch()" : "(status='cancelled' OR starts_at<=unixepoch())"}${match ? ` AND (starts_at ${comparison} ? OR (starts_at=? AND id ${comparison} ?))` : ''} ORDER BY starts_at ${order},id ${order} LIMIT 51`,
+      `SELECT ${appointmentColumns} FROM appointments WHERE shop_id=? AND customer_phone=? AND ${upcoming ? "status='confirmed' AND completed_at IS NULL AND starts_at>unixepoch()" : "(status='cancelled' OR completed_at IS NOT NULL OR starts_at<=unixepoch())"}${match ? ` AND (starts_at ${comparison} ? OR (starts_at=? AND id ${comparison} ?))` : ''} ORDER BY starts_at ${order},id ${order} LIMIT 51`,
     )
     .bind(shop.id, phone, ...(match ? [Number(match[1]), Number(match[1]), match[2]] : []))
     .all<AppointmentRecord>();

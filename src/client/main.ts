@@ -4,6 +4,8 @@ import { createMyBookings } from './my-bookings';
 import { createReservationAccess } from './reservation-access';
 import { createHubTools } from './hub-tools';
 import { copyText } from './clipboard';
+import { createReceipts } from './receipts';
+import { money, paymentMethods } from '../finance';
 import type { AppointmentRecord } from '../calendar';
 import {
   addDays,
@@ -258,10 +260,10 @@ function renderAgenda(): void {
   const today = localDate();
   shell(`<section class="hub-heading"><div><span class="eyebrow">${escape(shopName())} / AGENDA DIÁRIA</span><h1>O dia começa aqui<span>.</span></h1><p class="muted">Reservas pelo link e encaixes, na mesma agenda.</p></div><button class="text-button" data-action="logout">Sair do hub →</button></section>
     ${hubTabs()}<section class="agenda"><div class="agenda-toolbar"><div><label for="agenda-date">Data da agenda</label><input type="date" id="agenda-date" value="${state.date}" max="${addDays(today, 90)}"></div><button class="primary" data-action="new">+ Novo encaixe</button></div><div class="agenda-day"><h2>${escape(dateLabel(state.date))}</h2><div><span>${state.appointments.length} atendimento${state.appointments.length !== 1 ? 's' : ''}</span><button class="text-button" data-action="refresh">Atualizar ↻</button></div></div><nav class="agenda-filters" aria-label="Situação dos atendimentos"><button class="text-button" data-action="active-bookings" aria-pressed="${state.agendaStatus === 'confirmed'}">Ativos</button><button class="text-button" data-action="booking-history" aria-pressed="${state.agendaStatus === 'all'}">Histórico</button></nav>${errorBox()}${state.notice ? `<p class="success-note" role="status">${escape(state.notice)}</p>` : ''}
-    <div aria-live="polite">${state.loading ? '<p class="empty">Carregando agenda…</p>' : state.appointments.length ? `<ol class="appointments">${state.appointments.map((a) => `<li><div class="appointment-time"><strong>${timeLabel(a.starts_at)}</strong><span>${timeLabel(a.ends_at)}</span></div><div class="appointment-info"><span class="tag">${a.origin === 'hub' ? 'ENCAIXE / HUB' : 'RESERVA / LINK'}</span><h3>${escape(a.customer_name)}</h3><p>${escape(a.service_name)} · ${escape(a.price_label)}</p><a href="https://wa.me/${escape(a.customer_phone.replace(/\D/g, ''))}" target="_blank" rel="noopener noreferrer" aria-label="Conversar com ${escape(a.customer_name)} pelo WhatsApp">${escape(a.customer_phone)} · WhatsApp</a><div class="row-actions">${a.status === 'confirmed' ? `<button class="text-button" data-reschedule="${a.id}">Remarcar</button><button class="text-button danger-text" data-cancel="${a.id}">Cancelar</button>` : ''}<button class="text-button" data-history="${a.id}">Ver histórico</button></div></div><span class="status ${a.status === 'cancelled' ? 'cancelled' : ''}">${a.status === 'cancelled' ? 'Cancelado' : 'Confirmado'}</span></li>`).join('')}</ol>` : '<div class="empty"><span class="empty-icon" aria-hidden="true">◷</span><h3>Um dia cheio de possibilidades.</h3><p>Nenhum atendimento nesta data. Os agendamentos aparecem aqui assim que são confirmados.</p></div>'}</div><p class="note">${zoneLabel()} · Atualize a agenda para consultar novas reservas.</p></section>`);
+    <div aria-live="polite">${state.loading ? '<p class="empty">Carregando agenda…</p>' : state.appointments.length ? `<ol class="appointments">${state.appointments.map((a) => `<li><div class="appointment-time"><strong>${timeLabel(a.starts_at)}</strong><span>${timeLabel(a.ends_at)}</span></div><div class="appointment-info"><span class="tag">${a.origin === 'hub' ? 'ENCAIXE / HUB' : 'RESERVA / LINK'}</span><h3>${escape(a.customer_name)}</h3><p>${escape(a.service_name)} · ${escape(a.price_label)}</p><a href="https://wa.me/${escape(a.customer_phone.replace(/\D/g, ''))}" target="_blank" rel="noopener noreferrer" aria-label="Conversar com ${escape(a.customer_name)} pelo WhatsApp">${escape(a.customer_phone)} · WhatsApp</a><div class="row-actions">${a.status === 'confirmed' && !a.completed_at ? `<button class="text-button" data-reschedule="${a.id}">Remarcar</button><button class="text-button danger-text" data-cancel="${a.id}">Cancelar</button>` : ''}<button class="text-button" data-history="${a.id}">Ver histórico</button>${a.status === 'confirmed' && !a.completed_at ? `<button class="text-button" data-complete="${a.id}" ${a.starts_at * 1000 > Date.now() ? 'disabled title="Disponível após o início do atendimento"' : ''}>Concluir atendimento</button>` : ''}<button class="text-button" data-payment="${a.id}">${a.payment_amount_cents != null ? 'Ver recebimento' : 'Registrar pagamento'}</button></div>${a.payment_amount_cents != null ? `<p class="agenda-payment">Recebido ${money(a.payment_amount_cents)} · ${paymentMethods[a.payment_method!]} · ${a.payment_paid_on!.split('-').reverse().join('/')}</p>` : '<p class="agenda-payment muted">Sem recebimento registrado</p>'}</div><span class="status ${a.status === 'cancelled' ? 'cancelled' : ''}">${a.status === 'cancelled' ? 'Cancelado' : a.completed_at ? 'Concluído' : 'Confirmado'}</span></li>`).join('')}</ol>` : '<div class="empty"><span class="empty-icon" aria-hidden="true">◷</span><h3>Um dia cheio de possibilidades.</h3><p>Nenhum atendimento nesta data. Os agendamentos aparecem aqui assim que são confirmados.</p></div>'}</div><p class="note">${zoneLabel()} · Atualize a agenda para consultar novas reservas.</p></section>`);
 }
 function hubTabs(): string {
-  return `<nav class="hub-tabs" aria-label="Painel do estabelecimento"><button class="text-button" data-action="agenda-view" aria-pressed="${state.hubView === 'agenda'}">Agenda</button><button class="text-button" data-action="customers" aria-pressed="${state.hubView === 'customers'}">Clientes</button><button class="text-button" data-action="settings" aria-pressed="${state.hubView === 'settings'}">Configurar agenda</button></nav>`;
+  return `<nav class="hub-tabs" aria-label="Painel do estabelecimento"><button class="text-button" data-action="agenda-view" aria-pressed="${state.hubView === 'agenda' && !receivables.active()}">Agenda</button><button class="text-button" data-action="customers" aria-pressed="${state.hubView === 'customers' && !receivables.active()}">Clientes</button><button class="text-button" data-action="settings" aria-pressed="${state.hubView === 'settings' && !receivables.active()}">Configurar agenda</button><button class="text-button" data-action="receipts" aria-pressed="${receivables.isReport()}">Recebimentos</button></nav>`;
 }
 function renderCustomers(): void {
   shell(
@@ -300,6 +302,7 @@ function render(): void {
   else if (isCustomer) myBookings.render();
   else if (!isHub || state.booking) renderBooking();
   else if (!state.loggedIn) renderLogin();
+  else if (receivables.active()) receivables.render();
   else if (management.active()) management.render();
   else if (state.hubView === 'customers') renderCustomers();
   else renderAgenda();
@@ -364,6 +367,7 @@ function handleError(error: unknown): void {
     state.customers = [];
     state.appointments = [];
     management.close();
+    receivables.close();
   }
 }
 function resetBooking(): void {
@@ -405,6 +409,23 @@ const management = createAgendaManagement({
     await loadAgenda();
   },
 });
+const receivables = createReceipts({
+  api,
+  shell,
+  tabs: hubTabs,
+  escape,
+  shop: () => state.shop!,
+  onError: handleError,
+  prepare: () => {
+    management.close();
+    state.booking = false;
+  },
+  onDone: async (message) => {
+    receivables.close();
+    state.notice = message;
+    await loadAgenda();
+  },
+});
 const myBookings = createMyBookings({
   api,
   shell,
@@ -429,7 +450,7 @@ const reservationAccess = createReservationAccess({
 });
 app.addEventListener('click', async (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
-  if (!button || button.disabled || state.busy || management.busy) return;
+  if (!button || button.disabled || state.busy || management.busy || receivables.busy) return;
   if (isPrivate) {
     await reservationAccess.click(button);
     return;
@@ -441,6 +462,20 @@ app.addEventListener('click', async (event) => {
   }
   state.error = '';
   state.notice = '';
+  if (isHub && state.loggedIn && (await receivables.click(button))) return;
+  if (
+    isHub &&
+    [
+      'agenda-view',
+      'customers',
+      'settings',
+      'logout',
+      'new',
+      'active-bookings',
+      'booking-history',
+    ].includes(button.dataset.action || '')
+  )
+    receivables.close();
   if (isHub && state.loggedIn && (await management.click(button))) return;
   if (button.dataset.publicService) {
     state.serviceId = button.dataset.publicService;
@@ -620,6 +655,7 @@ app.addEventListener('change', async (event) => {
     await myBookings.change(input);
     return;
   }
+  if (isHub && state.loggedIn && receivables.change(input)) return;
   if (isHub && state.loggedIn && (await management.change(input))) return;
   if (input.id === 'date' && input.value) {
     state.date = input.value;
@@ -640,6 +676,7 @@ app.addEventListener('input', (event) => {
     myBookings.input(input);
     return;
   }
+  if (isHub && state.loggedIn && receivables.input(input)) return;
   if (isHub && state.loggedIn && management.input(input)) return;
   if (input.id === 'service-search') {
     state.serviceQuery = input.value;
@@ -659,7 +696,7 @@ app.addEventListener('input', (event) => {
 });
 app.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (state.busy || management.busy) return;
+  if (state.busy || management.busy || receivables.busy) return;
   const form = event.target as HTMLFormElement;
   if (!form.reportValidity()) return;
   if (isCustomer) {
@@ -667,6 +704,7 @@ app.addEventListener('submit', async (event) => {
     return;
   }
   state.error = '';
+  if (isHub && state.loggedIn && (await receivables.submit(form))) return;
   if (isHub && state.loggedIn && (await management.submit(form))) return;
   if (form.id === 'register-customer') {
     state.busy = true;

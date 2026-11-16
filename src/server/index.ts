@@ -24,6 +24,7 @@ import {
   revokeBookingLink,
 } from './booking-links';
 import { hubManifest } from './hub-manifest';
+import { completeAppointment, getReceipt, registerReceipt, receiptReport } from './receipts';
 import {
   customerCookie,
   finishVerification,
@@ -333,7 +334,7 @@ async function api(request: Request, env: Env) {
     if (!action && request.method === 'GET')
       return json({ appointment: customerReceipt(appointment) });
     if (action === 'availability' && request.method === 'GET') {
-      if (appointment.status !== 'confirmed')
+      if (appointment.status !== 'confirmed' || appointment.completed_at)
         throw new ApiError(409, 'A reserva já foi cancelada.');
       const date = url.searchParams.get('date');
       validateDate(date, Date.now(), shop.timezone);
@@ -386,7 +387,8 @@ async function api(request: Request, env: Env) {
       if (!customerAction[2] && request.method === 'GET')
         return json({ appointment: customerReceipt(a) });
       if (customerAction[2] === 'availability' && request.method === 'GET') {
-        if (a.status !== 'confirmed') throw new ApiError(409, 'A reserva já foi cancelada.');
+        if (a.status !== 'confirmed' || a.completed_at)
+          throw new ApiError(409, 'A reserva já foi cancelada.');
         const date = url.searchParams.get('date');
         validateDate(date, Date.now(), shop.timezone);
         return json({
@@ -413,6 +415,23 @@ async function api(request: Request, env: Env) {
   if (path === '/admin/login' && request.method === 'POST')
     return login(request, env, shop, adminPath);
   if (path.startsWith('/admin/')) await requireAdmin(request, env, shop);
+  if (path === '/admin/receipts' && request.method === 'GET')
+    return json(await receiptReport(env.DB, shop, url));
+  const financial = path.match(/^\/admin\/bookings\/([^/]+)\/(complete|payment)$/);
+  if (financial) {
+    const [, id, action] = financial;
+    if (action === 'complete' && request.method === 'POST')
+      return json(await completeAppointment(env.DB, shop, id, await body(request)));
+    if (action === 'payment' && request.method === 'GET')
+      return json({
+        appointment: await getAppointment(env.DB, shop, id),
+        receipt: await getReceipt(env.DB, shop, id),
+      });
+    if (action === 'payment' && request.method === 'POST') {
+      const result = await registerReceipt(env.DB, shop, id, await body(request));
+      return json(result, result.replayed ? 200 : 201);
+    }
+  }
   if (path === '/admin/customers' && request.method === 'POST')
     return json(await registerCustomer(env.DB, shop, await body(request)), 201);
   const revoke = path.match(/^\/admin\/bookings\/([^/]+)\/access\/revoke$/);
@@ -452,7 +471,7 @@ async function api(request: Request, env: Env) {
       path === '/admin/availability' ? url.searchParams.get('appointmentId') : null;
     if (appointmentId) {
       const appointment = await getAppointment(env.DB, shop, appointmentId);
-      if (appointment.status !== 'confirmed')
+      if (appointment.status !== 'confirmed' || appointment.completed_at)
         throw new ApiError(409, 'A reserva já foi cancelada.');
       return json({
         date,
@@ -505,7 +524,7 @@ async function api(request: Request, env: Env) {
       throw new ApiError(400, 'Filtro de situação inválido.');
     const [open, close] = dayBounds(date, shop.timezone);
     const { results } = await env.DB.prepare(
-      `SELECT ${appointmentColumns} FROM appointments WHERE shop_id = ? AND starts_at >= ? AND starts_at < ? AND (?='all' OR status=?) ORDER BY starts_at`,
+      `SELECT ${appointmentColumns},(SELECT amount_cents FROM receipts r WHERE r.shop_id=appointments.shop_id AND r.appointment_id=appointments.id) AS payment_amount_cents,(SELECT method FROM receipts r WHERE r.shop_id=appointments.shop_id AND r.appointment_id=appointments.id) AS payment_method,(SELECT paid_on FROM receipts r WHERE r.shop_id=appointments.shop_id AND r.appointment_id=appointments.id) AS payment_paid_on FROM appointments WHERE shop_id = ? AND starts_at >= ? AND starts_at < ? AND (?='all' OR status=?) ORDER BY starts_at`,
     )
       .bind(shop.id, open, close, status, status)
       .all();

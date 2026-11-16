@@ -53,6 +53,10 @@ export interface AppointmentRecord {
   status: 'confirmed' | 'cancelled';
   version: number;
   cancelled_at: number | null;
+  completed_at: number | null;
+  payment_amount_cents?: number | null;
+  payment_method?: import('./finance').PaymentMethod | null;
+  payment_paid_on?: string | null;
 }
 export interface BookingEvent {
   id: number;
